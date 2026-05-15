@@ -69,20 +69,22 @@
 
         const toEasternArabic = (num) => String(num).split('').map(digit => ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'][digit] || digit).join('');
 
-        // تم تطبيق التعديل هنا: محرك تمييز متقدم لأسئلة الاختبار
         const formatQuestionText = (text) => {
             if (!text) return text;
             
+            // إضافة سطر جديد قبل الأرقام (مثل 1- أو 1.) لفصلها في سطور مستقلة وعدم تجاورها
+            let processedText = text.replace(/(\s+)?([0-9٠-٩]+\s*[-.]\s*(?![0-9٠-٩]))/g, '\n$2').trim();
+            
             let starterSpan = null;
-            let remainingText = text;
+            let remainingText = processedText;
 
             // التقاط الكلمات الافتتاحية في بداية السؤال وعزلها
             const startersRegex = /^(بم تفسر|ما النتائج المترتبة على|دلل|ماذا يحدث إذا|قارن|ما العلاقة)\s*[:؛-]?\s*/i;
-            const match = text.match(startersRegex);
+            const match = remainingText.match(startersRegex);
             
             if (match) {
                 starterSpan = <span key="starter" className={`${questionStarterColor} font-black ml-2 text-2xl`}>{match[0]}</span>;
-                remainingText = text.substring(match[0].length);
+                remainingText = remainingText.substring(match[0].length);
             }
 
             const places = ['مصر', 'آسيا', 'أوروبا', 'إفريقيا', 'الوطن العربي', 'الشام', 'العراق', 'فلسطين'];
@@ -101,6 +103,7 @@
                 return newElems;
             };
 
+            elements = processElements(elements, /(\n)/g, 'newline');
             elements = processElements(elements, /((?:[0-9]+|[٠-٩]+)(?:\s*(?:ق\.م|م|هـ))?)/g, 'date');
             elements = processElements(elements, /(\([^)]+\))/g, 'parentheses');
             if (places.length > 0) elements = processElements(elements, new RegExp(`(${places.join('|')})`, 'gi'), 'place');
@@ -108,6 +111,7 @@
             elements = processElements(elements, /\*\*(.*?)\*\*/g, 'manual');
 
             const mappedElements = elements.map((el, idx) => {
+                if (el.type === 'newline') return <br key={idx} />;
                 if (el.type === 'date') return <span key={idx} className="text-[#4169e1] font-black px-1">{el.content}</span>;
                 if (el.type === 'parentheses') return <span key={idx} className="text-green-800 font-black px-1">{el.content}</span>;
                 if (el.type === 'place') return <span key={idx} className="text-red-600 font-black px-1">{el.content}</span>;
@@ -126,9 +130,13 @@
 
         const highlightAnswer = (text, concept) => {
             if (!text) return text;
+
+            // إضافة سطر جديد قبل الأرقام (مثل 1- أو 1.) لفصلها في سطور مستقلة وعدم تجاورها
+            let processedText = text.replace(/(\s+)?([0-9٠-٩]+\s*[-.]\s*(?![0-9٠-٩]))/g, '\n$2').trim();
+
             const places = ['مصر', 'آسيا', 'أوروبا', 'إفريقيا', 'الوطن العربي', 'الشام', 'العراق', 'فلسطين'];
             const characters = ['الإسلامي', 'الطولونية', 'الإخشيدية', 'الفاطمية', 'الأيوبية', 'المملوكية', 'العثماني', 'الفرنسية', 'صلاح الدين', 'عمر بن الخطاب'];
-            let elements = [{ type: 'text', content: text }];
+            let elements = [{ type: 'text', content: processedText }];
             
             const processElements = (elems, regex, type) => {
                 let newElems = [];
@@ -141,6 +149,7 @@
                 return newElems;
             };
 
+            elements = processElements(elements, /(\n)/g, 'newline');
             elements = processElements(elements, /((?:["'«”])[^"'»“]+(?:["'»“]))/g, 'quote');
             if (concept) elements = processElements(elements, new RegExp(`(${concept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), 'concept');
             elements = processElements(elements, /((?:[0-9]+|[٠-٩]+)(?:\s*(?:ق\.م|م|هـ))?)/g, 'date');
@@ -150,6 +159,7 @@
             elements = processElements(elements, /\*\*(.*?)\*\*/g, 'manual');
 
             return elements.map((el, idx) => {
+                if (el.type === 'newline') return <br key={idx} />;
                 if (el.type === 'concept') return <span key={idx} className="text-secondary font-black px-1 bg-pink-50 rounded">{el.content}</span>;
                 if (el.type === 'quote') return <span key={idx} className="text-purple-600 font-black px-1">{el.content}</span>;
                 if (el.type === 'date') return <span key={idx} className="text-[#4169e1] font-black px-1">{el.content}</span>;
@@ -878,7 +888,7 @@
                             <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col justify-center">
                                 <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 relative border-2 mt-4">
                                     <div className="absolute -top-4 right-8 bg-secondary text-white font-bold px-4 py-1 rounded-full">سؤال {toEasternArabic(currentQIndex+1)}</div>
-                                    <h2 className="text-2xl font-bold text-primary mt-2">{formatQuestionText(question.q)}</h2>
+                                    <h2 className="text-2xl font-bold text-primary mt-2 leading-relaxed">{formatQuestionText(question.q)}</h2>
                                 </div>
 
                                 {question.type === 'mcq' && (
@@ -898,7 +908,7 @@
                                 {question.type === 'essay' && (
                                     <div className="mb-8 w-full text-center">
                                         {!isAnswered ? <button onClick={handleEssayReveal} className="bg-primary text-white font-bold text-2xl py-6 px-12 rounded-2xl w-full max-w-lg">الإجابة <i className="fas fa-eye ml-2"></i></button> : (
-                                            <div className="bg-green-50 rounded-3xl p-6 border-r-8 border-green-500 text-right"><h3 className="text-2xl font-black text-green-800 mb-4">الإجابة:</h3><div className="text-xl font-bold text-gray-800">{highlightAnswer(question.answer, question.concept)}</div></div>
+                                            <div className="bg-green-50 rounded-3xl p-6 border-r-8 border-green-500 text-right leading-relaxed"><h3 className="text-2xl font-black text-green-800 mb-4">الإجابة:</h3><div className="text-xl font-bold text-gray-800 leading-relaxed">{highlightAnswer(question.answer, question.concept)}</div></div>
                                         )}
                                     </div>
                                 )}
