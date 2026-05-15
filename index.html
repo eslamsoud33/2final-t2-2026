@@ -588,6 +588,21 @@
                 );
             }
 
+            if (screen === 'welcome') {
+                return (
+                    <div className="h-screen w-full flex items-center justify-center p-4 bg-gray-50">
+                        <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-md w-full border-t-8 border-secondary animate-fade-in relative overflow-hidden">
+                            <i className="fas fa-hand-sparkles text-6xl text-secondary mb-6 block relative z-10"></i>
+                            <h2 className="text-3xl font-black text-primary mb-4 relative z-10">مرحباً {studentName.split(' ')[0]}!</h2>
+                            <p className="text-lg text-gray-600 font-semibold mb-8 relative z-10">هل أنت مستعد لنبدأ المراجعة والتحدي؟</p>
+                            <button onClick={() => setScreen('index')} className="bg-secondary text-white font-black text-xl py-4 px-10 rounded-full w-full shadow-lg hover:bg-pink-600 transition-colors relative z-10">
+                                انطلق! 🚀
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
             if (screen === 'home') {
                 const livePhone = formatPhoneStr(inputPhone); const liveAdmin = BASE_STUDENTS[livePhone];
                 let liveStudents = studentsList[livePhone]; if (liveStudents && !Array.isArray(liveStudents)) liveStudents = [liveStudents];
