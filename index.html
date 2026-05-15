@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>موسوعة الكنز التعليمي - دراسات اجتماعية</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { primary: '#050505', secondary: '#FF1493' },
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Cairo', sans-serif; margin: 0; padding: 0; background-color: #fcfcfc; user-select: none; -webkit-user-select: none; overflow: hidden; height: 100vh; }
+        .watermark-container { position: relative; }
+        .watermark-container::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="180" viewBox="0 0 300 180"><text x="20" y="100" transform="rotate(-30 150 90)" fill="%23050505" fill-opacity="0.08" font-family="Cairo, sans-serif" font-size="40" font-weight="900">أ/ إسلام سعود</text></svg>');
+            background-repeat: repeat; pointer-events: none; z-index: 0;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #FF1493; }
+        #drawing-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+        #drawing-canvas.active { pointer-events: auto; cursor: crosshair; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const API_URL = "https://script.google.com/macros/s/AKfycbyXvGqr748mD4wmZcEsQI9w99kA9dkCzXIn5RrvWEnm8zGB-8CPSIRcC7QWOvt8y6Dl/exec"; 
+        const SECRET_API_KEY = "Kanz_Secret_2026_Secure"; // مفتاح الأمان (سيتم تشفيره مع الباسووردات في التشويش)
+
+        const BASE_STUDENTS = {
+            "01228466613": { role: "admin", name: "eslam", pass: "442004" },
+            "01205058940": { role: "secretary", name: "mostafa", pass: "0" }
+        };
+
+        const subjectName = "دراسات اجتماعية";
+        const gradeName = "الصف الثاني الاعدادي";
+        const PAYMENT_INFO = { fee: "50 جنيهاً", vodafoneCash: "01228466613", instapay: "01228466613" };
+        
+        // لون رأس السؤال الافتتاحي
+        const questionStarterColor = "text-purple-700"; 
+
+        const toEasternArabic = (num) => String(num).split('').map(digit => ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'][digit] || digit).join('');
+
+        // تم تطبيق التعديل هنا: محرك تمييز متقدم لأسئلة الاختبار
+        const formatQuestionText = (text) => {
+            if (!text) return text;
+            
+            let starterSpan = null;
+            let remainingText = text;
+
+            // التقاط الكلمات الافتتاحية في بداية السؤال وعزلها
+            const startersRegex = /^(بم تفسر|ما النتائج المترتبة على|دلل|ماذا يحدث إذا|قارن|ما العلاقة)\s*[:؛-]?\s*/i;
+            const match = text.match(startersRegex);
+            
+            if (match) {
+                starterSpan = <span key="starter" className={`${questionStarterColor} font-black ml-2 text-2xl`}>{match[0]}</span>;
+                remainingText = text.substring(match[0].length);
+            }
+
+            const places = ['مصر', 'آسيا', 'أوروبا', 'إفريقيا', 'الوطن العربي', 'الشام', 'العراق', 'فلسطين'];
+            const characters = ['الإسلامي', 'الطولونية', 'الإخشيدية', 'الفاطمية', 'الأيوبية', 'المملوكية', 'العثماني', 'الفرنسية', 'صلاح الدين', 'عمر بن الخطاب'];
+            
+            let elements = [{ type: 'text', content: remainingText }];
+
+            const processElements = (elems, regex, type) => {
+                let newElems = [];
+                elems.forEach(el => {
+                    if (el.type !== 'text') return newElems.push(el);
+                    el.content.split(regex).forEach((part, idx) => {
+                        if (part) newElems.push({ type: idx % 2 === 1 ? type : 'text', content: part });
+                    });
+                });
+                return newElems;
+            };
+
+            elements = processElements(elements, /((?:[0-9]+|[٠-٩]+)(?:\s*(?:ق\.م|م|هـ))?)/g, 'date');
+            elements = processElements(elements, /(\([^)]+\))/g, 'parentheses');
+            if (places.length > 0) elements = processElements(elements, new RegExp(`(${places.join('|')})`, 'gi'), 'place');
+            if (characters.length > 0) elements = processElements(elements, new RegExp(`(${characters.join('|')})`, 'gi'), 'character');
+            elements = processElements(elements, /\*\*(.*?)\*\*/g, 'manual');
+
+            const mappedElements = elements.map((el, idx) => {
+                if (el.type === 'date') return <span key={idx} className="text-[#4169e1] font-black px-1">{el.content}</span>;
+                if (el.type === 'parentheses') return <span key={idx} className="text-green-800 font-black px-1">{el.content}</span>;
+                if (el.type === 'place') return <span key={idx} className="text-red-600 font-black px-1">{el.content}</span>;
+                if (el.type === 'character') return <span key={idx} className="text-[#4169e1] font-black px-1">{el.content}</span>;
+                if (el.type === 'manual') return <span key={idx} className="font-bold text-blue-600 bg-blue-50 px-1 rounded-md">{el.content}</span>;
+                return <span key={idx} className="text-gray-800">{el.content}</span>;
+            });
+
+            return (
+                <React.Fragment>
+                    {starterSpan}
+                    {mappedElements}
+                </React.Fragment>
+            );
+        };
+
+        const highlightAnswer = (text, concept) => {
+            if (!text) return text;
+            const places = ['مصر', 'آسيا', 'أوروبا', 'إفريقيا', 'الوطن العربي', 'الشام', 'العراق', 'فلسطين'];
+            const characters = ['الإسلامي', 'الطولونية', 'الإخشيدية', 'الفاطمية', 'الأيوبية', 'المملوكية', 'العثماني', 'الفرنسية', 'صلاح الدين', 'عمر بن الخطاب'];
+            let elements = [{ type: 'text', content: text }];
+            
+            const processElements = (elems, regex, type) => {
+                let newElems = [];
+                elems.forEach(el => {
+                    if (el.type !== 'text') return newElems.push(el);
+                    el.content.split(regex).forEach((part, idx) => {
+                        if (part) newElems.push({ type: idx % 2 === 1 ? type : 'text', content: part });
+                    });
+                });
+                return newElems;
+            };
+
+            elements = processElements(elements, /((?:["'«”])[^"'»“]+(?:["'»“]))/g, 'quote');
+            if (concept) elements = processElements(elements, new RegExp(`(${concept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'), 'concept');
+            elements = processElements(elements, /((?:[0-9]+|[٠-٩]+)(?:\s*(?:ق\.م|م|هـ))?)/g, 'date');
+            elements = processElements(elements, /(\([^)]+\))/g, 'parentheses');
+            if (places.length > 0) elements = processElements(elements, new RegExp(`(${places.join('|')})`, 'gi'), 'place');
+            if (characters.length > 0) elements = processElements(elements, new RegExp(`(${characters.join('|')})`, 'gi'), 'character');
+            elements = processElements(elements, /\*\*(.*?)\*\*/g, 'manual');
+
+            return elements.map((el, idx) => {
+                if (el.type === 'concept') return <span key={idx} className="text-secondary font-black px-1 bg-pink-50 rounded">{el.content}</span>;
+                if (el.type === 'quote') return <span key={idx} className="text-purple-600 font-black px-1">{el.content}</span>;
+                if (el.type === 'date') return <span key={idx} className="text-[#4169e1] font-black px-1">{el.content}</span>;
+                if (el.type === 'parentheses') return <span key={idx} className="text-green-800 font-black px-1">{el.content}</span>;
+                if (el.type === 'place') return <span key={idx} className="text-red-600 font-black px-1">{el.content}</span>;
+                if (el.type === 'character') return <span key={idx} className="text-[#4169e1] font-black px-1">{el.content}</span>;
+                if (el.type === 'manual') return <span key={idx} className="font-bold text-blue-600 bg-blue-50 px-1 rounded-md">{el.content}</span>;
+                return <span key={idx} className="text-gray-800">{el.content}</span>;
+            });
+        };
+
+        const formatPhoneStr = (phone) => {
+            if (!phone) return "";
+            let cleaned = String(phone).replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[\s\+\.]/g, "");
+            if (cleaned.startsWith("20") && cleaned.length > 10) cleaned = cleaned.substring(2);
+            if (cleaned.length === 10 && cleaned.startsWith("1")) cleaned = "0" + cleaned;
+            return cleaned;
+        };
+
+        const generateDeviceFingerprint = () => {
+            const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+            ctx.textBaseline = "top"; ctx.font = "14px 'Arial'"; ctx.textBaseline = "alphabetic";
+            ctx.fillStyle = "#f60"; ctx.fillRect(125,1,62,20);
+            ctx.fillStyle = "#069"; ctx.fillText("EdTech-Fingerprint", 2, 15);
+            ctx.fillStyle = "rgba(102, 204, 0, 0.7)"; ctx.fillText("EdTech-Fingerprint", 4, 17);
+            const b64 = canvas.toDataURL().replace("data:image/png;base64,","");
+            const bin = atob(b64);
+            const crc32 = function(r){for(var a,o=[],c=0;c<256;c++){a=c;for(var f=0;f<8;f++)a=1&a?3988292384^a>>>1:a>>>1;o[c]=a}for(var n=-1,t=0;t<r.length;t++)n=n>>>8^o[255&(n^r.charCodeAt(t))];return(-1^n)>>>0};
+            return crc32(bin).toString(16) + "-" + navigator.userAgent.length;
+        };
+
+        const buildCourseData = (flatQuestions) => {
+            const course = []; let unitCounter = 1; let lessonCounter = 1;
+            flatQuestions.forEach(row => {
+                const unitTitle = row.unit || "وحدة عامة"; const lessonTitle = row.section || "درس عام";
+                let unit = course.find(u => u.title === unitTitle);
+                if (!unit) { unit = { id: `unit_${unitCounter++}`, title: unitTitle, lessons: [] }; course.push(unit); }
+                let lesson = unit.lessons.find(l => l.title === lessonTitle);
+                if (!lesson) { lesson = { id: `lesson_${lessonCounter++}`, title: lessonTitle, questions: [], completed: false }; unit.lessons.push(lesson); }
+                const options = [row.opt1, row.opt2, row.opt3, row.opt4].filter(o => o && o.toString().trim() !== "");
+                lesson.questions.push({
+                    type: row.type || "mcq", q: row.q, options: options, correct: row.correct,
+                    reason: row.reason, answer: row.reason, concept: row.concept,
+                    paragraph: row.paragraph, section: lessonTitle
+                });
+            });
+            return course;
+        };
+
+        const DrawingCanvas = ({ isEnabled }) => {
+            const canvasRef = useRef(null); const ctxRef = useRef(null); const [isDrawing, setIsDrawing] = useState(false); const pointsRef = useRef([]);
+            useEffect(() => {
+                const canvas = canvasRef.current; canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+                const ctx = canvas.getContext('2d'); ctx.lineCap = 'round'; ctx.strokeStyle = '#FF1493'; ctx.lineWidth = 4; ctxRef.current = ctx;
+                const handleResize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; ctxRef.current.lineCap='round'; ctxRef.current.strokeStyle='#FF1493'; ctxRef.current.lineWidth=4; };
+                window.addEventListener('resize', handleResize); return () => window.removeEventListener('resize', handleResize);
+            }, []);
+            const startDrawing = (e) => { if(!isEnabled) return; const rect = canvasRef.current.getBoundingClientRect(); const x = (e.clientX || e.touches[0].clientX) - rect.left; const y = (e.clientY || e.touches[0].clientY) - rect.top; ctxRef.current.beginPath(); ctxRef.current.moveTo(x, y); setIsDrawing(true); pointsRef.current = [{x, y}]; };
+            const draw = (e) => { if(!isDrawing || !isEnabled) return; e.preventDefault(); const rect = canvasRef.current.getBoundingClientRect(); const x = (e.clientX || e.touches[0].clientX) - rect.left; const y = (e.clientY || e.touches[0].clientY) - rect.top; ctxRef.current.lineTo(x, y); ctxRef.current.stroke(); pointsRef.current.push({x, y}); };
+            const stopDrawing = () => { if(!isDrawing) return; ctxRef.current.closePath(); setIsDrawing(false); checkIfCheckmark(pointsRef.current); };
+            const checkIfCheckmark = (points) => {
+                if(points.length < 15) return;
+                let maxY = 0; let lowestIndex = 0;
+                points.forEach((p, i) => { if(p.y > maxY){ maxY = p.y; lowestIndex = i; } });
+                if(lowestIndex > points.length * 0.1 && lowestIndex < points.length * 0.9) {
+                    let drops = 0; for(let i = 1; i < points.length; i++) { if(points[i].x < points[i-1].x - 10) drops++; }
+                    if(drops < 3) { ctxRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); pointsRef.current = []; }
+                }
+            };
+            return <canvas ref={canvasRef} id="drawing-canvas" className={isEnabled ? 'active' : ''} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseOut={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}></canvas>;
+        };
+
+        const App = () => {
+            const [screen, setScreen] = useState('home');
+            const [studentName, setStudentName] = useState('');
+            const [inputPhone, setInputPhone] = useState('');
+            const [showPasswordInput, setShowPasswordInput] = useState(false);
+            const [inputPassword, setInputPassword] = useState('');
+            const [selectedTwin, setSelectedTwin] = useState(null);
+            const [adminError, setAdminError] = useState('');
+            
+            const [showRegisterModal, setShowRegisterModal] = useState(false);
+            const [registerName, setRegisterName] = useState('');
+            const [registerMethod, setRegisterMethod] = useState('');
+            
+            const [platformFee, setPlatformFee] = useState(PAYMENT_INFO.fee);
+            const [newFeeInput, setNewFeeInput] = useState('');
+            
+            const [isLoading, setIsLoading] = useState(false);
+            const [loginError, setLoginError] = useState('');
+            const [studentData, setStudentData] = useState(null);
+            
+            const [showUnpaidModal, setShowUnpaidModal] = useState(false);
+            const [unpaidPaymentMethod, setUnpaidPaymentMethod] = useState('');
+            
+            const [adminResults, setAdminResults] = useState([]);
+            const [adminPendingReqs, setAdminPendingReqs] = useState([]);
+            const [adminPendingPays, setAdminPendingPays] = useState([]);
+            const [adminActiveTab, setAdminActiveTab] = useState('results');
+            const [searchQuery, setSearchQuery] = useState('');
+            
+            const [activeLesson, setActiveLesson] = useState(null);
+            const [data, setData] = useState([]); 
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [userAnswers, setUserAnswers] = useState([]);
+            const [isDrawingMode, setIsDrawingMode] = useState(false);
+            const [isFullscreen, setIsFullscreen] = useState(false);
+            const [activeFilter, setActiveFilter] = useState('all');
+            const [isDarkMode, setIsDarkMode] = useState(false);
+            const [expandedUnits, setExpandedUnits] = useState([]);
+            const [showResetModal, setShowResetModal] = useState(false);
+            const [studentsList, setStudentsList] = useState({});
+            
+            const touchStartX = useRef(null);
+            const touchEndX = useRef(null);
+
+            useEffect(() => {
+                window.history.pushState({ screen: 'home' }, '');
+                const handlePopState = () => {
+                    if (screen === 'quiz') setScreen('index');
+                    else if (screen === 'index') setScreen('home');
+                    else if (screen === 'result') setScreen('index');
+                    else window.history.pushState(null, ''); 
+                };
+                window.addEventListener('popstate', handlePopState);
+                return () => window.removeEventListener('popstate', handlePopState);
+            }, [screen]);
+
+            useEffect(() => {
+                if (screen === 'quiz' && activeLesson) {
+                    const sessionData = { lessonId: activeLesson.id, unitId: data.find(u => u.lessons.some(l => l.id === activeLesson.id))?.id, answers: userAnswers, currentIndex: currentQIndex };
+                    localStorage.setItem('savedSession', JSON.stringify(sessionData));
+                    const handleBeforeUnload = (e) => { e.returnValue = 'مغادرة الاختبار؟'; };
+                    window.addEventListener('beforeunload', handleBeforeUnload);
+                    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+                } else if (screen === 'result') localStorage.removeItem('savedSession');
+            }, [screen, activeLesson, userAnswers, currentQIndex, data]);
+
+            useEffect(() => {
+                const loadStudents = async () => {
+                    try {
+                        const response = await fetch(`${API_URL}?action=getAllStudents&apiKey=${SECRET_API_KEY}`);
+                        const result = await response.json();
+                        if(result.status === 'success') {
+                            if(result.data) setStudentsList(result.data);
+                            if(result.fee) setPlatformFee(result.fee);
+                        }
+                    } catch(e) {}
+                };
+                loadStudents();
+            }, []);
+
+            useEffect(() => {
+                const savedUser = localStorage.getItem('loggedInUser');
+                const savedPhone = localStorage.getItem('loggedInPhone');
+                if (savedUser && savedPhone) {
+                    const st = JSON.parse(savedUser);
+                    setStudentData(st);
+                    setStudentName(st.name);
+                    setInputPhone(savedPhone);
+                    if (st.isPaid || !st.missingMonths || st.missingMonths.length === 0) {
+                        setScreen('returning_welcome');
+                    }
+                }
+            }, []);
+
+            const confirmReset = () => {
+                const resetData = data.map(unit => ({ ...unit, lessons: unit.lessons.map(l => ({ ...l, completed: false })) }));
+                setData(resetData); setShowResetModal(false); setActiveFilter('all'); localStorage.removeItem('savedSession');
+            };
+
+            const toggleUnit = (unitId) => {
+                setExpandedUnits(prev => prev.includes(unitId) ? prev.filter(id => id !== unitId) : [...prev, unitId]);
+            };
+
+            const toggleFullscreen = () => {
+                if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(e=>console.log(e)); setIsFullscreen(true); } 
+                else { document.exitFullscreen(); setIsFullscreen(false); }
+            };
+
+            const stats = useMemo(() => {
+                let total = 0, completed = 0;
+                data.forEach(unit => { unit.lessons.forEach(l => { total++; if (l.completed) completed++; }); });
+                return { total, completed, remaining: total - completed, progress: total ? Math.round((completed/total)*100) : 0 };
+            }, [data]);
+
+            const handleResume = async () => {
+                setIsLoading(true);
+                try {
+                    const qRes = await fetch(`${API_URL}?action=getQuestions&apiKey=${SECRET_API_KEY}`); 
+                    const qData = await qRes.json();
+                    if (qData.status === 'success') {
+                        const builtData = buildCourseData(qData.data);
+                        setData(builtData);
+                        
+                        const session = localStorage.getItem('savedSession');
+                        if (session) {
+                            const parsedSession = JSON.parse(session);
+                            let foundLesson = null;
+                            builtData.forEach(u => {
+                                const l = u.lessons.find(l => l.id === parsedSession.lessonId);
+                                if (l) foundLesson = l;
+                            });
+                            if (foundLesson) {
+                                setActiveLesson(foundLesson);
+                                setUserAnswers(parsedSession.answers || []);
+                                setCurrentQIndex(parsedSession.currentIndex || 0);
+                                setScreen('quiz');
+                            } else {
+                                setScreen('index');
+                            }
+                        } else {
+                            setScreen('index');
+                        }
+                    } else {
+                        setLoginError("فشل تحميل الأسئلة من السيرفر.");
+                        setScreen('home');
+                    }
+                } catch(e) { 
+                    setLoginError("حدث خطأ أثناء جلب الأسئلة."); 
+                    setScreen('home');
+                }
+                setIsLoading(false);
+            };
+
+            const handleLogout = () => {
+                if(window.confirm('هل أنت متأكد من الخروج من الحساب؟\n(ملاحظة: سيتم الاحتفاظ بمستوى تقدمك في الاختبار ولن يتم مسحه)')) {
+                    localStorage.removeItem('loggedInUser');
+                    localStorage.removeItem('loggedInPhone');
+                    setStudentData(null);
+                    setStudentName('');
+                    setInputPhone('');
+                    setInputPassword('');
+                    setShowPasswordInput(false);
+                    setScreen('home');
+                }
+            };
+
+            const handleLogin = async () => {
+                setLoginError(''); const formattedPhone = formatPhoneStr(inputPhone);
+                if (!formattedPhone || formattedPhone.length < 10) { setLoginError('يرجى إدخال رقم هاتف صحيح.'); return; }
+                setIsLoading(true);
+
+                const loadQuestionsAndNavigate = async (targetScreen) => {
+                    try {
+                        const qRes = await fetch(`${API_URL}?action=getQuestions&apiKey=${SECRET_API_KEY}`); const qData = await qRes.json();
+                        if (qData.status === 'success') {
+                            setData(buildCourseData(qData.data));
+                            if (targetScreen === 'welcome') setScreen(localStorage.getItem('savedSession') ? 'index' : 'welcome');
+                            else setScreen(targetScreen);
+                        } else setLoginError("فشل تحميل الأسئلة من السيرفر.");
+                    } catch(e) { setLoginError("حدث خطأ أثناء جلب الأسئلة."); }
+                };
+
+                if (BASE_STUDENTS[formattedPhone]) {
+                    if (!showPasswordInput) { setShowPasswordInput(true); setIsLoading(false); return; }
+                    const user = BASE_STUDENTS[formattedPhone];
+                    if (inputPassword === user.pass) {
+                        setStudentName(user.name);
+                        if (user.role === 'admin') { fetchAdminData(); await loadQuestionsAndNavigate('admin'); } 
+                        else if (user.role === 'secretary') { await loadQuestionsAndNavigate('welcome'); }
+                        setShowPasswordInput(false); setInputPassword('');
+                    } else setLoginError("الرقم السري خاطئ.");
+                    setIsLoading(false); return;
+                }
+
+                let localStudents = studentsList[formattedPhone];
+                if (localStudents) {
+                    if (!Array.isArray(localStudents)) localStudents = [localStudents];
+                    if (localStudents.length > 1 && !selectedTwin) { setLoginError('اختر اسمك من القائمة أولاً.'); setIsLoading(false); return; }
+                    const st = selectedTwin || localStudents[0];
+                    setStudentName(st.name); setStudentData(st);
+                    
+                    const fingerprint = generateDeviceFingerprint();
+                    try {
+                        const fpRes = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveDeviceFingerprint', phone: `${formattedPhone}_${st.name}`, fingerprint: fingerprint, apiKey: SECRET_API_KEY }) });
+                        const fpData = await fpRes.json();
+                        if (fpData.status === 'blocked') { setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); setIsLoading(false); return; }
+                    } catch(e) {}
+
+                    if (st.isPaid || !st.missingMonths || st.missingMonths.length === 0) {
+                        localStorage.setItem('loggedInUser', JSON.stringify(st));
+                        localStorage.setItem('loggedInPhone', formattedPhone);
+                        await loadQuestionsAndNavigate('welcome');
+                    } else setShowUnpaidModal(true);
+                    setIsLoading(false); return;
+                }
+
+                try {
+                    const response = await fetch(`${API_URL}?action=login&phone=${formattedPhone}&apiKey=${SECRET_API_KEY}`);
+                    const result = await response.json();
+                    if (result.status === 'success') {
+                        let fetchedStudents = Array.isArray(result.student) ? result.student : [result.student];
+                        if (fetchedStudents.length > 1 && !selectedTwin) {
+                            setStudentsList(prev => ({...prev, [formattedPhone]: fetchedStudents}));
+                            setLoginError('الرجاء اختيار اسمك أولاً.'); setIsLoading(false); return;
+                        }
+                        const st = selectedTwin || fetchedStudents[0];
+                        setStudentName(st.name); setStudentData(st);
+                        
+                        const fingerprint = generateDeviceFingerprint();
+                        const fpRes = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveDeviceFingerprint', phone: `${formattedPhone}_${st.name}`, fingerprint: fingerprint, apiKey: SECRET_API_KEY }) });
+                        const fpData = await fpRes.json();
+                        if (fpData.status === 'blocked') { setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); setIsLoading(false); return; }
+
+                        if (st.isPaid || !st.missingMonths || st.missingMonths.length === 0) {
+                            localStorage.setItem('loggedInUser', JSON.stringify(st));
+                            localStorage.setItem('loggedInPhone', formattedPhone);
+                            await loadQuestionsAndNavigate('welcome');
+                        } else setShowUnpaidModal(true);
+                    } else if (result.status === 'unregistered' || result.message === 'الرقم غير مسجل لدينا.') {
+                        const reqRes = await fetch(`${API_URL}?action=getPendingRequests&apiKey=${SECRET_API_KEY}`); const reqData = await reqRes.json();
+                        if (reqData.status === 'success' && reqData.data && reqData.data.some(r => formatPhoneStr(r.phone) === formattedPhone)) setLoginError('طلبك قيد مراجعة الإدارة.');
+                        else setShowRegisterModal(true);
+                    } else setLoginError(result.message || 'حدث خطأ.');
+                } catch (error) { setLoginError('خطأ في الاتصال بالإنترنت.'); }
+                setIsLoading(false);
+            };
+
+            const fetchAdminData = async () => {
+                setAdminError(''); setIsLoading(true);
+                try {
+                    const res = await fetch(`${API_URL}?action=getResults&apiKey=${SECRET_API_KEY}`); const data = await res.json();
+                    if(data.status === 'success') setAdminResults(data.data); else setAdminError(data.message);
+                    const reqRes = await fetch(`${API_URL}?action=getPendingRequests&apiKey=${SECRET_API_KEY}`); const reqData = await reqRes.json();
+                    if(reqData.status === 'success') setAdminPendingReqs(reqData.data);
+                } catch(e) { setAdminError('فشل الاتصال بقاعدة البيانات.'); }
+                setIsLoading(false);
+            };
+
+            const handleRegisterSubmit = async () => {
+                if (!registerName || !registerMethod) { alert('أدخل الاسم واختر طريقة الدفع.'); return; }
+                const formattedPhone = formatPhoneStr(inputPhone); const sheetPhone = '+20' + formattedPhone.substring(1);
+                const whatsappMsg = `مرحباً أ/إسلام\nأود الاشتراك في منصة الكنز التعليمي\nالاسم: ${registerName}\nرقم الهاتف: ${inputPhone}\nالمرحلة: ${gradeName}\nتم التحويل عبر: ${registerMethod}\n(مرفق صورة التحويل)`;
+                window.location.href = `https://wa.me/201228466613?text=${encodeURIComponent(whatsappMsg)}`;
+                try { fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'requestSubscription', date: new Date().toLocaleString('ar-EG'), name: registerName, phone: sheetPhone, method: registerMethod, apiKey: SECRET_API_KEY }) }); } catch(e) {}
+            };
+
+            const getUnpaidDetails = (months) => {
+                if (!months || months.length === 0) return { total: 0 };
+                let total = 0;
+                months.forEach(m => {
+                    if (m.includes('مايو')) total += 50;
+                    else total += 100;
+                });
+                return { total };
+            };
+
+            const handleUnpaidSubmit = () => {
+                if (!unpaidPaymentMethod) { alert('يرجى اختيار طريقة الدفع.'); return; }
+                const details = getUnpaidDetails(studentData.missingMonths);
+                const monthsText = (studentData.missingMonths && studentData.missingMonths.length > 0) ? studentData.missingMonths.join('، ') : 'مراجعة عامة للمصروفات';
+                const whatsappMsg = `مرحباً أ/إسلام\nأود سداد المبالغ المتأخرة\nالاسم: ${studentData.name}\nرقم الهاتف: ${inputPhone}\nالشهور المتأخرة: ${monthsText}\nالمبلغ المطلوب: ${details.total} جنيهاً\nتم التحويل عبر: ${unpaidPaymentMethod}\n(مرفق صورة التحويل)`;
+                window.location.href = `https://wa.me/201228466613?text=${encodeURIComponent(whatsappMsg)}`;
+            };
+
+            const handleActivateMonth = async (phone, name, month) => {
+                if (!window.confirm(`تفعيل شهر (${month}) للطالب: ${name}؟`)) return;
+                try {
+                    fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'activateSpecificMonth', phone: phone, month: month, apiKey: SECRET_API_KEY }) });
+                    setStudentsList(prev => {
+                        const newList = {...prev};
+                        if(newList[phone]) newList[phone] = newList[phone].map(s => s.name === name ? { ...s, missingMonths: s.missingMonths.filter(m => m !== month), isPaid: s.missingMonths.length <= 1 } : s);
+                        return newList;
+                    });
+                    alert(`تم تفعيل شهر ${month}`);
+                } catch(e) { alert('خطأ'); }
+            };
+
+            const handleApproveSubscription = async (phone, name) => {
+                if (!window.confirm(`تفعيل حساب: ${name}؟`)) return;
+                window.open(`https://wa.me/20${formatPhoneStr(phone).substring(1)}?text=${encodeURIComponent(`أهلا بك ${name} تم التفعيل`)}`, '_blank');
+                setAdminPendingReqs(prev => prev.filter(req => req.phone !== phone || req.name !== name));
+                try { 
+                    await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'approveSubscription', phone: phone, name: name, apiKey: SECRET_API_KEY }) }); 
+                    alert('تم التفعيل بنجاح وإضافة الطالب لجوجل شيت!'); 
+                    setTimeout(fetchAdminData, 2000);
+                } catch(e) { alert('خطأ في الاتصال بالخادم'); }
+            };
+
+            const handleRejectSubscription = async (phone, name) => {
+                if (!window.confirm(`رفض طلب: ${name}؟`)) return;
+                setAdminPendingReqs(prev => prev.filter(req => req.phone !== phone || req.name !== name));
+                try { 
+                    await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'rejectSubscription', phone: phone, name: name, apiKey: SECRET_API_KEY }) }); 
+                    alert('تم الرفض وإزالة الطلب من جوجل شيت!'); 
+                    setTimeout(fetchAdminData, 2000);
+                } catch(e) { alert('خطأ في الاتصال بالخادم'); }
+            };
+
+            const handleApprovePayment = async (phone, name) => {
+                if (!window.confirm(`تفعيل الشهور وسداد متأخرات الطالب: ${name}؟`)) return;
+                try { await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'approvePayment', phone: phone, name: name, apiKey: SECRET_API_KEY }) }); alert('تم التفعيل!'); fetchAdminData(); } catch(e) { alert('خطأ'); }
+            };
+
+            const handleUpdateFee = async () => {
+                if (!newFeeInput) return;
+                try {
+                    await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateSettings', fee: newFeeInput, apiKey: SECRET_API_KEY }) });
+                    alert('تم تحديث قيمة الاشتراك'); setPlatformFee(newFeeInput); setNewFeeInput('');
+                } catch(e) { alert('خطأ'); }
+            };
+
+            const saveResultToDB = async (scoreObj) => {
+                if(API_URL.includes("XXXXXXXXXX")) return;
+                try {
+                    const formattedPhone = formatPhoneStr(inputPhone); if (BASE_STUDENTS[formattedPhone]) return;
+                    await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveResult', phone: formattedPhone.startsWith('0') ? '+20'+formattedPhone.substring(1) : formattedPhone, name: studentName, quiz: scoreObj.quizName, score: scoreObj.score, date: new Date().toLocaleString('ar-EG'), apiKey: SECRET_API_KEY }) });
+                } catch(e) {}
+            };
+
+            useEffect(() => {
+                if (screen === 'result' && activeLesson) {
+                    const totalQs = activeLesson.questions.length; 
+                    const correct = userAnswers.filter(a => a.isCorrect).length; 
+                    const perc = Math.round((correct/totalQs)*100);
+                    saveResultToDB({ quizName: activeLesson.title, score: `${perc}%` });
+                }
+            }, [screen, activeLesson, userAnswers]);
+
+            if (screen === 'returning_welcome') {
+                return (
+                    <div className="h-screen w-full flex items-center justify-center p-4 bg-gray-50">
+                        <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-md w-full border-t-8 border-secondary animate-fade-in relative overflow-hidden">
+                            <i className="fas fa-hand-sparkles text-6xl text-secondary mb-6 block relative z-10"></i>
+                            <h2 className="text-3xl font-black text-primary mb-4 relative z-10">مرحباً يا بطل {studentName.split(' ')[0]}!</h2>
+                            <p className="text-lg text-gray-600 font-semibold mb-8 relative z-10">مستعد نكمل ما بدأناه؟</p>
+                            <button onClick={handleResume} disabled={isLoading} className="bg-secondary text-white font-black text-xl py-4 px-10 rounded-full w-full shadow-lg mb-4 hover:bg-pink-600 transition-colors relative z-10">
+                                {isLoading ? <i className="fas fa-spinner fa-spin"></i> : 'تأكيد (نعم مستعد) 🚀'}
+                            </button>
+                            <button onClick={handleLogout} className="text-gray-500 font-bold text-sm underline hover:text-red-500 mt-2 relative z-10">
+                                تسجيل خروج (لست {studentName.split(' ')[0]})
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'home') {
+                const livePhone = formatPhoneStr(inputPhone); const liveAdmin = BASE_STUDENTS[livePhone];
+                let liveStudents = studentsList[livePhone]; if (liveStudents && !Array.isArray(liveStudents)) liveStudents = [liveStudents];
+
+                return (
+                    <div className="h-screen w-full flex items-center justify-center p-4 md:p-6 overflow-y-auto custom-scrollbar relative bg-[#f8fafc] watermark-container">
+                        <div className="w-full max-w-2xl flex flex-col items-center gap-4 sm:gap-5 py-6 z-10 my-auto">
+                            
+                            {/* Graduation Cap */}
+                            <i className="fas fa-graduation-cap text-6xl sm:text-7xl md:text-8xl text-secondary drop-shadow-sm mb-2"></i>
+                            
+                            {/* Logo Text */}
+                            <div className="flex flex-row items-center justify-center gap-3 sm:gap-4 mb-2">
+                                <span className="text-primary font-black text-6xl sm:text-7xl md:text-8xl tracking-tighter">موسوعة</span>
+                                <div className="w-1.5 h-14 sm:h-20 bg-primary rounded-sm"></div>
+                                <div className="flex flex-col justify-center text-right">
+                                    <span className="font-black text-2xl sm:text-3xl md:text-4xl leading-none mb-1 text-yellow-500">الكنز</span>
+                                    <span className="text-primary font-black text-2xl sm:text-3xl md:text-4xl leading-none">التعليمي</span>
+                                </div>
+                            </div>
+                            
+                            {/* Subtitle */}
+                            <div className="text-center space-y-2 px-2 mt-1">
+                                <h2 className="text-lg sm:text-xl md:text-2xl font-black text-gray-800">
+                                    بوابتك الذكية لإتقان <span className="text-secondary">({subjectName})</span>
+                                </h2>
+                                <p className="text-sm sm:text-base md:text-lg text-gray-700 font-bold max-w-md mx-auto leading-relaxed border-2 border-yellow-500 bg-white p-3 rounded-2xl shadow-sm mt-2">
+                                    ومنصتك الشاملة للمراجعة النهائية واختبار قدراتك قبل الامتحان بأسلوب تفاعلي مميز وعصري.
+                                </p>
+                            </div>
+
+                            {/* Grade Button (Moved Above Login Box) */}
+                            <div className="inline-block bg-primary text-white px-8 py-2 rounded-full font-bold shadow-md mt-4 text-sm sm:text-base text-center">
+                                لـ {gradeName}
+                            </div>
+
+                            {/* Login Box */}
+                            <div className="w-full max-w-xs sm:max-w-sm md:max-w-md bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] p-6 md:p-8 pt-10 border border-gray-100 flex flex-col items-center gap-4 relative mt-2">
+                                <div className="absolute top-0 right-0 bg-secondary text-white text-xs sm:text-sm font-black px-5 py-2 rounded-tr-[1.5rem] rounded-bl-[1.5rem] shadow-sm">
+                                    مراجعة ليلة الامتحان
+                                </div>
+                                
+                                <h3 className="text-xl sm:text-2xl font-black text-primary mt-4">ابدأ رحلتك الآن</h3>
+                                
+                                <div className="w-full relative mt-2">
+                                    <input type="tel" placeholder="أدخل رقم الهاتف المسجل لدينا" className={`w-full text-center border-b-2 border-gray-200 focus:border-primary outline-none py-3 text-sm sm:text-base font-bold text-gray-600 transition-colors ${showPasswordInput ? 'opacity-50' : ''}`} value={inputPhone} onChange={(e) => { setInputPhone(e.target.value); setSelectedTwin(null); if (showPasswordInput) { setShowPasswordInput(false); setInputPassword(''); } }} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} disabled={showPasswordInput} />
+                                    {liveAdmin && !showPasswordInput && <div className="text-secondary font-black text-sm mt-3 text-center">مرحباً يا : {liveAdmin.name}</div>}
+                                    {liveStudents && !showPasswordInput && !liveAdmin && (
+                                        <div className="w-full mt-4">
+                                            {liveStudents.length === 1 ? <div className="text-secondary font-black text-sm text-center">مرحباً يا : {liveStudents[0].name}</div> : (
+                                                <div className="flex flex-col gap-2 items-center bg-gray-50 p-3 rounded-xl border border-gray-200">
+                                                    <div className="text-primary font-bold text-sm text-center">يوجد أكثر من طالب، هل أنت:</div>
+                                                    <div className="flex flex-wrap justify-center gap-2">
+                                                        {liveStudents.map((st, idx) => <button key={idx} onClick={() => { setSelectedTwin(st); setLoginError(''); }} className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm border-2 ${selectedTwin?.name === st.name ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-700 hover:border-secondary'}`}>{st.name}</button>)}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {showPasswordInput && (
+                                        <div className="w-full text-center mt-4">
+                                            <div className="text-secondary font-black text-sm mb-2">مرحباً يا : {liveAdmin?.name}</div>
+                                            <input type="password" placeholder="الرقم السري" className="w-full text-center border-b-2 border-gray-300 focus:border-secondary outline-none py-2 text-base font-bold" value={inputPassword} onChange={(e) => setInputPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} autoFocus />
+                                        </div>
+                                    )}
+                                    {loginError && <div className="text-red-500 text-xs sm:text-sm font-bold mt-4 text-center bg-red-50 py-2 px-3 rounded-lg border border-red-100"><i className="fas fa-exclamation-circle"></i> {loginError}</div>}
+                                </div>
+                                
+                                <button onClick={handleLogin} disabled={isLoading} className="w-full bg-primary text-white font-bold text-base sm:text-lg py-3.5 rounded-xl hover:bg-gray-900 transition-colors duration-300 shadow-md mt-2 flex items-center justify-center gap-2">
+                                    {isLoading ? <i className="fas fa-spinner fa-spin"></i> : <>دخول <i className="fas fa-arrow-left"></i></>}
+                                </button>
+
+                                {/* Vision and Prep (Enlarged and directly below Login button) */}
+                                <div className="text-center mt-4 text-lg sm:text-xl flex justify-center gap-1.5 w-full">
+                                    <span className="text-primary font-bold">رؤية وإعداد أ/</span> <span className="text-blue-900 font-black">إسلام سعود</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'index') {
+                return (
+                    <div className="h-screen flex flex-col watermark-container bg-gray-50">
+                        {/* الهيدر الجديد المطابق للصورة (متجاوب مع الموبايل) */}
+                        <div className="bg-white shadow-sm px-4 py-4 z-10 border-b-2 flex flex-col lg:flex-row justify-between items-center gap-4 w-full">
+                            
+                            {/* اللوجو باليمين (تعديل 1: القبعة يمين، ثم النصوص يسارها محاذاة لليمين) */}
+                            <div className="flex items-center gap-3 shrink-0 w-full lg:w-auto justify-start">
+                                <i className="fas fa-graduation-cap text-4xl sm:text-5xl text-secondary shrink-0"></i>
+                                <div className="flex flex-col items-start text-right">
+                                    <div className="flex items-center gap-1 font-black text-2xl sm:text-3xl leading-none mb-1">
+                                        <span className="text-secondary">موسوعة</span>
+                                        <span className="text-primary">الكنز التعليمي</span>
+                                    </div>
+                                    <div className="text-[11px] sm:text-xs font-bold flex gap-1">
+                                        <span className="text-secondary">رؤية وإعداد أ/</span>
+                                        <span className="text-blue-900">إسلام سعود</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* الأزرار والإحصائيات باليسار */}
+                            <div className="flex flex-col gap-3 shrink-0 w-full lg:w-auto">
+                                {/* الصف العلوي: الأزرار */}
+                                <div className="flex justify-center lg:justify-end items-center gap-2 overflow-x-auto custom-scrollbar pb-1 w-full" dir="rtl">
+                                    {BASE_STUDENTS[formatPhoneStr(inputPhone)]?.role === 'admin' && (
+                                        <button onClick={() => setScreen('admin')} className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-4 py-1.5 rounded-full text-sm font-black flex items-center gap-2 shrink-0 shadow-sm hover:bg-blue-100 transition-colors">
+                                            الإدارة <i className="fas fa-user-shield"></i>
+                                        </button>
+                                    )}
+                                    <button onClick={() => setShowResetModal(true)} className="bg-[#fff1f2] text-[#ef4444] border border-[#fecaca] px-4 py-1.5 rounded-full text-sm font-black flex items-center gap-2 shrink-0 shadow-sm hover:bg-red-50 transition-colors">
+                                        تصفير <i className="fas fa-sync-alt"></i>
+                                    </button>
+                                    <div className="bg-[#f8fafc] text-[#334155] border border-[#e2e8f0] px-4 py-1.5 rounded-full text-sm font-black shrink-0 shadow-sm">
+                                        {gradeName}
+                                    </div>
+                                    <button onClick={handleLogout} className="text-red-500 hover:text-white hover:bg-red-500 bg-red-50 px-3 py-1.5 rounded-full text-xs font-bold transition-colors border border-red-100 shadow-sm flex items-center gap-1 shrink-0 mr-auto lg:mr-2">
+                                        خروج <i className="fas fa-sign-out-alt"></i>
+                                    </button>
+                                </div>
+
+                                {/* الصف السفلي: الإحصائيات */}
+                                <div className="flex justify-center lg:justify-end items-stretch gap-2 w-full" dir="rtl">
+                                    {/* التقدم (Black) */}
+                                    <div className="flex-1 lg:flex-none lg:w-24 bg-[#050505] text-white rounded-xl py-2 px-1 flex flex-col items-center justify-center shadow-md">
+                                        <div className="text-[10px] sm:text-xs font-bold text-gray-300 mb-0.5">التقدم</div>
+                                        <div className="text-sm sm:text-base font-black flex items-center gap-0.5 text-secondary" dir="ltr">
+                                            <span>%</span><span>{toEasternArabic(stats.progress)}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* إجمالي الدروس (Pink) */}
+                                    <button onClick={()=>setActiveFilter('all')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-2 px-1 flex flex-col items-center justify-center shadow-md transition-all ${activeFilter==='all'?'bg-secondary text-white ring-2 ring-offset-1 ring-secondary':'bg-secondary text-white opacity-90'}`}>
+                                        <div className="text-[10px] sm:text-xs font-bold text-pink-100 mb-0.5">إجمالي الدروس</div>
+                                        <div className="text-sm sm:text-base font-black">{toEasternArabic(stats.total)}</div>
+                                    </button>
+                                    
+                                    {/* المنجز (White with Green text/border) */}
+                                    <button onClick={()=>setActiveFilter('completed')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-2 px-1 flex flex-col items-center justify-center border shadow-sm transition-all ${activeFilter==='completed'?'bg-green-50 border-green-500 ring-1 ring-green-500':'bg-white border-gray-200 hover:border-green-400'}`}>
+                                        <div className="text-[10px] sm:text-xs font-bold text-green-500 mb-0.5">المنجز</div>
+                                        <div className="text-sm sm:text-base font-black text-green-500">{toEasternArabic(stats.completed)}</div>
+                                    </button>
+
+                                    {/* المتبقي (Red) */}
+                                    <button onClick={()=>setActiveFilter('remaining')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-2 px-1 flex flex-col items-center justify-center shadow-md transition-all ${activeFilter==='remaining'?'bg-red-600 text-white ring-2 ring-offset-1 ring-red-600':'bg-[#ef4444] text-white hover:bg-red-600'}`}>
+                                        <div className="text-[10px] sm:text-xs font-bold text-white mb-0.5">المتبقي</div>
+                                        <div className="text-sm sm:text-base font-black text-white">{toEasternArabic(stats.remaining)}</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 z-10">
+                            <div className="max-w-4xl mx-auto space-y-4">
+                                {data.map(unit => {
+                                    if (unit.lessons.length === 0) return null;
+                                    if (activeFilter !== 'all' && !unit.lessons.some(l => activeFilter === 'completed' ? l.completed : !l.completed)) return null;
+                                    return (
+                                        <div key={unit.id} className="bg-white rounded-2xl shadow-md border overflow-hidden animate-fade-in">
+                                            <div className="bg-gray-50 px-4 py-4 border-b cursor-pointer flex justify-between items-center" onClick={() => toggleUnit(unit.id)}>
+                                                <h2 className="text-xl font-black text-primary">{unit.title}</h2><i className={`fas fa-chevron-${expandedUnits.includes(unit.id) ? 'up' : 'down'}`}></i>
+                                            </div>
+                                            {(expandedUnits.includes(unit.id) || activeFilter !== 'all') && (
+                                                <div className="divide-y">
+                                                    {unit.lessons.filter(l => activeFilter === 'all' || (activeFilter === 'completed' ? l.completed : !l.completed)).map(lesson => (
+                                                        <div key={lesson.id} onClick={() => { 
+                                                            const session = localStorage.getItem('savedSession');
+                                                            let restored = false;
+                                                            if (session) {
+                                                                const parsed = JSON.parse(session);
+                                                                if (parsed.lessonId === lesson.id) {
+                                                                    setActiveLesson(lesson);
+                                                                    setUserAnswers(parsed.answers || []);
+                                                                    setCurrentQIndex(parsed.currentIndex || 0);
+                                                                    setScreen('quiz');
+                                                                    restored = true;
+                                                                }
+                                                            }
+                                                            if (!restored) {
+                                                                setActiveLesson(lesson); setCurrentQIndex(0); setUserAnswers([]); setScreen('quiz'); 
+                                                            }
+                                                        }} className="px-6 py-5 flex justify-between items-center cursor-pointer hover:bg-gray-50">
+                                                            <div className="font-bold text-lg text-gray-700">{lesson.title}</div>
+                                                            {lesson.completed ? <i className="fas fa-check-circle text-green-500 text-2xl"></i> : <i className="fas fa-play-circle text-gray-300 text-2xl"></i>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {showResetModal && (
+                            <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+                                <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl text-center animate-fade-in flex flex-col">
+                                    <i className="fas fa-exclamation-triangle text-5xl text-red-500 mb-4 block"></i>
+                                    <h2 className="text-2xl font-black text-primary mb-2">تصفير التقدم؟</h2>
+                                    <p className="text-gray-600 font-bold mb-6 text-sm">هل أنت متأكد من مسح جميع إجاباتك في كافة الدروس والبدء من جديد؟</p>
+                                    <div className="flex gap-2">
+                                        <button onClick={confirmReset} className="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl text-sm hover:bg-red-600">نعم، مسح</button>
+                                        <button onClick={() => setShowResetModal(false)} className="flex-1 bg-gray-200 text-gray-800 font-bold py-3 rounded-xl text-sm hover:bg-gray-300">إلغاء</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            if (screen === 'quiz' && activeLesson) {
+                const question = activeLesson.questions[currentQIndex]; const totalQs = activeLesson.questions.length;
+                const isAnswered = userAnswers[currentQIndex] !== undefined; const currentAnswer = userAnswers[currentQIndex];
+
+                const handleOptionClick = (option) => {
+                    if (isAnswered) return;
+                    const newAns = [...userAnswers]; newAns[currentQIndex] = { isCorrect: option === question.correct, selected: option, concept: question.concept, paragraph: question.paragraph, type: 'mcq' }; setUserAnswers(newAns);
+                };
+                const handleEssayReveal = () => {
+                    if (isAnswered) return;
+                    const newAns = [...userAnswers]; newAns[currentQIndex] = { isCorrect: true, concept: question.concept, paragraph: question.paragraph, type: 'essay' }; setUserAnswers(newAns);
+                };
+
+                return (
+                    <div className={`h-screen flex flex-col watermark-container relative ${isDarkMode?'bg-gray-900':''}`}>
+                        <DrawingCanvas isEnabled={isDrawingMode} />
+                        
+                        {/* الهيدر المدمج (Compact) الخاص بشاشة الاختبار ليتناسب مع الموبايل */}
+                        <div className={`shadow-md px-2 sm:px-4 py-2 flex justify-between items-center z-40 border-b-4 border-primary ${isDarkMode?'bg-gray-800':'bg-white'}`}>
+                            
+                            {/* الشعار المصغر باليمين (تعديل 1: القبعة يمين، ثم النصوص يسارها محاذاة لليمين) */}
+                            <div className="flex items-center gap-2 shrink-0 justify-start">
+                                <i className={`fas fa-graduation-cap text-xl sm:text-3xl shrink-0 ${isDarkMode?'text-gray-100':'text-secondary'}`}></i>
+                                <div className="flex flex-col hidden sm:flex items-start text-right">
+                                    <div className="flex items-center gap-1 font-black text-sm sm:text-lg leading-none mb-0.5">
+                                        <span className={isDarkMode?'text-secondary':'text-secondary'}>موسوعة</span>
+                                        <span className={isDarkMode?'text-gray-100':'text-primary'}>الكنز التعليمي</span>
+                                    </div>
+                                    <div className="text-[8px] sm:text-[10px] font-bold flex gap-1">
+                                        <span className={isDarkMode?'text-secondary':'text-secondary'}>رؤية وإعداد أ/</span>
+                                        <span className={isDarkMode?'text-blue-300':'text-blue-900'}>إسلام سعود</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* العداد الذكي المتقدم بالمنتصف */}
+                            <div className={`flex items-center justify-center px-4 sm:px-6 py-1.5 sm:py-2 rounded-full shadow-inner border shrink-0 mx-2 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'}`}>
+                                <div className="flex items-center gap-2" dir="ltr">
+                                    <div className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-white shadow-sm'}`}>
+                                        <i className={`fas fa-tasks text-xs sm:text-sm ${isDarkMode ? 'text-gray-300' : 'text-secondary'}`}></i>
+                                    </div>
+                                    <div className={`font-black text-sm sm:text-lg flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-primary'}`}>
+                                        <span className="text-secondary text-lg sm:text-2xl">{toEasternArabic(currentQIndex + 1)}</span>
+                                        <span className="opacity-50 pb-1">/</span>
+                                        <span className="text-sm sm:text-base">{toEasternArabic(totalQs)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* الأزرار المدمجة باليسار */}
+                            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                                <button onClick={toggleFullscreen} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isFullscreen?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className={`fas ${isFullscreen?'fa-compress':'fa-expand'}`}></i></button>
+                                <button onClick={()=>setIsDrawingMode(!isDrawingMode)} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isDrawingMode?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className="fas fa-pen"></i></button>
+                                <button onClick={()=>setIsDarkMode(!isDarkMode)} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isDarkMode?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className={`fas ${isDarkMode?'fa-sun':'fa-moon'}`}></i></button>
+                                <button onClick={()=>setScreen('index')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-50 flex items-center justify-center text-xs sm:text-base text-red-600 hover:bg-red-500 hover:text-white transition-colors"><i className="fas fa-home"></i></button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 z-10 flex flex-col">
+                            <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col justify-center">
+                                <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 relative border-2 mt-4">
+                                    <div className="absolute -top-4 right-8 bg-secondary text-white font-bold px-4 py-1 rounded-full">سؤال {toEasternArabic(currentQIndex+1)}</div>
+                                    <h2 className="text-2xl font-bold text-primary mt-2">{formatQuestionText(question.q)}</h2>
+                                </div>
+
+                                {question.type === 'mcq' && (
+                                    <div className="flex flex-col gap-4 mb-8">
+                                        {question.options.map((opt, idx) => {
+                                            let btnClass = "bg-white border-2 p-4 rounded-2xl font-bold text-xl flex items-center shadow-sm cursor-pointer";
+                                            if (isAnswered) {
+                                                if (opt === question.correct) btnClass = "bg-green-50 border-green-500 text-green-800 p-4 rounded-2xl font-bold text-xl flex items-center shadow-md";
+                                                else if (currentAnswer.selected === opt) btnClass = "bg-red-50 border-red-500 text-red-800 p-4 rounded-2xl font-bold text-xl flex items-center shadow-md";
+                                                else btnClass = "bg-gray-50 border-gray-200 p-4 rounded-2xl font-bold text-xl flex items-center opacity-60";
+                                            }
+                                            return <button key={idx} onClick={()=>handleOptionClick(opt)} className={btnClass} disabled={isAnswered}><span className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ml-4 shrink-0 text-white ${isAnswered?(opt===question.correct?'bg-green-500':(currentAnswer.selected===opt?'bg-red-500':'bg-gray-300')):'bg-primary'}`}>{['أ','ب','ج','د'][idx]}</span><span>{opt}</span></button>;
+                                        })}
+                                    </div>
+                                )}
+
+                                {question.type === 'essay' && (
+                                    <div className="mb-8 w-full text-center">
+                                        {!isAnswered ? <button onClick={handleEssayReveal} className="bg-primary text-white font-bold text-2xl py-6 px-12 rounded-2xl w-full max-w-lg">الإجابة <i className="fas fa-eye ml-2"></i></button> : (
+                                            <div className="bg-green-50 rounded-3xl p-6 border-r-8 border-green-500 text-right"><h3 className="text-2xl font-black text-green-800 mb-4">الإجابة:</h3><div className="text-xl font-bold text-gray-800">{highlightAnswer(question.answer, question.concept)}</div></div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {isAnswered && question.type === 'mcq' && (
+                                    <div className={`mt-4 rounded-3xl p-6 shadow-md border-r-8 ${currentAnswer.isCorrect?'bg-green-50 border-green-500':'bg-red-50 border-red-500'}`}><h3 className="text-xl font-black mb-2">التعليل:</h3><p className="text-xl font-bold leading-relaxed">{highlightAnswer(question.reason, question.concept)}</p></div>
+                                )}
+
+                                <div className="mt-auto pt-8 flex justify-between items-center">
+                                    <button onClick={()=>setCurrentQIndex(currentQIndex-1)} disabled={currentQIndex===0} className={`font-black text-xl py-3 px-8 rounded-2xl ${currentQIndex===0?'opacity-0':'bg-secondary text-white'}`}>السابق</button>
+                                    {isAnswered && <button onClick={()=>currentQIndex<totalQs-1?setCurrentQIndex(currentQIndex+1):setScreen('result')} className="bg-primary text-white font-black text-xl py-3 px-8 rounded-2xl">{currentQIndex===totalQs-1?'إنهاء':'التالي'} <i className="fas fa-arrow-left"></i></button>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'result' && activeLesson) {
+                const totalQs = activeLesson.questions.length; 
+                const correct = userAnswers.filter(a => a.isCorrect).length; 
+                const perc = Math.round((correct/totalQs)*100);
+                const wrongConcepts = [...new Set(userAnswers.filter(a => !a.isCorrect).map(a => a.concept ? `${a.concept} - (${a.paragraph||'الدرس'})` : `(${a.paragraph||'مراجعة'})`))];
+                const firstName = studentName ? studentName.split(' ')[0] : 'يا بطل';
+
+                return (
+                    <div className="h-screen w-full flex items-center justify-center p-6 bg-gray-50 overflow-y-auto">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-8 md:p-10 text-center border-t-8 border-primary my-auto animate-fade-in flex flex-col items-center">
+                            <i className={`fas ${perc===100?'fa-trophy text-yellow-500':perc>=75?'fa-medal text-blue-500':'fa-book-open text-secondary'} text-7xl md:text-8xl mb-4 block`}></i>
+                            <div className="text-5xl md:text-6xl font-black text-primary mb-6 flex justify-center items-center gap-1" dir="ltr">
+                                <span>{toEasternArabic(perc)}</span><span>%</span>
+                            </div>
+                            
+                            <div className="w-full mb-8">
+                                {perc === 100 && (
+                                    <div className="space-y-4">
+                                        <p className="text-xl md:text-2xl font-bold text-gray-800 leading-loose">
+                                            عاش يا بطل! لقد اجتزت ({activeLesson.title}) بنجاح.
+                                        </p>
+                                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm inline-block w-full">
+                                            <p className="text-lg font-black text-blue-800"><span className="text-[#4169e1]">أ/ إسلام سعود:</span> {firstName}، أنا فخور بك!</p>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {perc >= 75 && perc < 100 && (
+                                    <div className="space-y-4">
+                                        <p className="text-xl md:text-2xl font-bold text-gray-800 leading-loose">
+                                            عاش يا بطل! لقد اجتزت ({activeLesson.title}) بنجاح.
+                                            <span className="text-secondary mt-2 block text-lg">ولكن لضمان التقفيل، راجع هذه الأجزاء السريعة:</span>
+                                            <span className="text-primary block mt-1 font-black text-lg">({wrongConcepts.join('، ')})</span>
+                                        </p>
+                                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 shadow-sm inline-block w-full">
+                                            <p className="text-lg font-black text-blue-800"><span className="text-[#4169e1]">أ/ إسلام سعود:</span> {firstName}، أنا فخور بك!</p>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {perc < 75 && (
+                                    <div className="space-y-4">
+                                        <p className="text-xl md:text-2xl font-bold text-gray-800 leading-loose">
+                                            <span className="text-red-500 block mb-1">هناك أجزاء تحتاج تركيز:</span>
+                                            <span className="text-primary font-black block text-lg">({wrongConcepts.join('، ')})</span>
+                                        </p>
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 shadow-sm inline-block w-full">
+                                            <p className="text-base md:text-lg font-black text-yellow-800">
+                                                <span className="text-[#4169e1]">أ/ إسلام سعود:</span> {firstName}، لا تنسَ مراجعة ما سبق، في كل الأحوال سوف أكون فخور بك بإذن الله ❤️
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button onClick={()=>{setData(data.map(u=>({...u,lessons:u.lessons.map(l=>l.id===activeLesson.id?{...l,completed:true}:l)}))); setScreen('index');}} className="bg-primary text-white font-black text-xl md:text-2xl py-4 px-10 rounded-full w-full hover:bg-gray-900 transition-colors shadow-lg">العودة للفهرس</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (screen === 'admin') {
+                return (
+                    <div className="h-screen w-full flex flex-col bg-gray-50 watermark-container">
+                        <div className="bg-primary text-white p-4 flex justify-between items-center z-10 border-b-4 border-secondary flex-wrap gap-y-3">
+                            {/* اللوجو باليمين للإدارة (تعديل 1: القبعة يمين، ثم النصوص يسارها محاذاة لليمين) */}
+                            <div className="flex items-center gap-3 shrink-0 justify-start">
+                                <i className="fas fa-graduation-cap text-3xl sm:text-4xl text-secondary shrink-0"></i>
+                                <div className="flex flex-col items-start text-right">
+                                    <div className="flex items-center gap-1 font-black text-xl sm:text-2xl leading-none mb-1">
+                                        <span className="text-secondary">موسوعة</span>
+                                        <span className="text-white">الكنز التعليمي</span>
+                                    </div>
+                                    <div className="text-[10px] sm:text-xs font-bold flex gap-1">
+                                        <span className="text-secondary">رؤية وإعداد أ/</span>
+                                        <span className="text-gray-300">إسلام سعود</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button onClick={() => setScreen('index')} className="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-lg text-sm"><i className="fas fa-book-reader"></i> طالب</button>
+                                <button onClick={fetchAdminData} className="bg-secondary text-white font-bold px-3 py-1.5 rounded-lg text-sm"><i className="fas fa-sync-alt"></i> تحديث</button>
+                                <button onClick={() => { setInputPhone(''); setInputPassword(''); setShowPasswordInput(false); setScreen('home'); }} className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-lg text-sm"><i className="fas fa-sign-out-alt"></i> خروج</button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 z-10 flex flex-col md:flex-row gap-6">
+                            <div className="w-full md:w-64 bg-white rounded-2xl shadow-md p-3 flex flex-row md:flex-col overflow-x-auto gap-2">
+                                <button onClick={() => setAdminActiveTab('results')} className={`px-4 py-3 rounded-xl font-bold text-sm whitespace-nowrap text-right ${adminActiveTab==='results'?'bg-primary text-white':'text-gray-600'}`}>النتائج</button>
+                                <button onClick={() => setAdminActiveTab('requests')} className={`px-4 py-3 rounded-xl font-bold text-sm whitespace-nowrap text-right relative ${adminActiveTab==='requests'?'bg-primary text-white':'text-gray-600'}`}>الطلبات {adminPendingReqs.length>0&&<span className="absolute top-2 left-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">{adminPendingReqs.length}</span>}</button>
+                                <button onClick={() => setAdminActiveTab('search')} className={`px-4 py-3 rounded-xl font-bold text-sm whitespace-nowrap text-right ${adminActiveTab==='search'?'bg-primary text-white':'text-gray-600'}`}>التفعيل</button>
+                                <button onClick={() => setAdminActiveTab('settings')} className={`px-4 py-3 rounded-xl font-bold text-sm whitespace-nowrap text-right ${adminActiveTab==='settings'?'bg-primary text-white':'text-gray-600'}`}>الإعدادات</button>
+                            </div>
+                            <div className="flex-1 w-full space-y-6 min-w-0">
+                                {adminActiveTab === 'results' && (
+                                    <div className="bg-white rounded-2xl shadow-md overflow-hidden"><div className="bg-gray-50 px-6 py-4 border-b border-gray-200"><h2 className="text-xl font-black text-primary">النتائج الحية</h2></div>
+                                        <div className="overflow-x-auto"><table className="w-full text-right"><thead className="bg-gray-100 text-gray-600"><tr><th className="p-4">التاريخ</th><th className="p-4">الاسم</th><th className="p-4">الرقم</th><th className="p-4">الاختبار</th><th className="p-4 text-center">النتيجة</th></tr></thead><tbody className="divide-y divide-gray-100">{adminResults.map((res, i) => (<tr key={i}><td className="p-4 text-sm">{res.date}</td><td className="p-4 font-black">{res.name}</td><td className="p-4 font-bold" dir="ltr">{res.phone}</td><td className="p-4">{res.quiz}</td><td className="p-4 text-center"><span className="bg-secondary text-white px-3 py-1 rounded-full text-sm">{res.score}</span></td></tr>))}</tbody></table></div>
+                                    </div>
+                                )}
+                                {adminActiveTab === 'requests' && (
+                                    <div className="bg-white rounded-2xl shadow-md overflow-hidden"><div className="bg-gray-50 px-6 py-4 border-b border-gray-200"><h2 className="text-xl font-black text-primary">طلبات التسجيل</h2></div>
+                                        <div className="overflow-x-auto"><table className="w-full text-right"><thead className="bg-gray-100 text-gray-600"><tr><th className="p-4">التاريخ</th><th className="p-4">الاسم</th><th className="p-4">الرقم</th><th className="p-4">الدفع</th><th className="p-4 text-center">الإجراء</th></tr></thead><tbody className="divide-y divide-gray-100">{adminPendingReqs.map((req, i) => (<tr key={i}><td className="p-4 text-sm">{req.date}</td><td className="p-4 font-black">{req.name}</td><td className="p-4 font-bold" dir="ltr">{req.phone}</td><td className="p-4">{req.method}</td><td className="p-4 text-center"><div className="flex gap-2 justify-center"><button onClick={()=>handleApproveSubscription(req.phone, req.name)} className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm">موافقة</button><button onClick={()=>handleRejectSubscription(req.phone, req.name)} className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm">رفض</button></div></td></tr>))}</tbody></table></div>
+                                    </div>
+                                )}
+                                {adminActiveTab === 'search' && (
+                                    <div className="bg-white rounded-2xl shadow-md overflow-hidden"><div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center"><h2 className="text-xl font-black text-primary">التفعيل</h2><input type="text" placeholder="بحث..." className="border-2 rounded-lg px-4 py-2" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} /></div>
+                                        <div className="p-6 space-y-3">
+                                            {Object.entries(studentsList).map(([phone, arr]) => (Array.isArray(arr)?arr:[arr]).map((st, i) => {
+                                                if (searchQuery && !st.name.includes(searchQuery) && !phone.includes(searchQuery)) return null;
+                                                if (st.isPaid || !st.missingMonths || st.missingMonths.length===0) return null;
+                                                return <div key={`${phone}-${i}`} className="bg-gray-50 border p-4 rounded-xl flex justify-between items-center"><div><div className="font-black text-lg text-primary">{st.name}</div><div className="font-bold text-gray-500" dir="ltr">{phone}</div></div><div className="flex gap-2">{st.missingMonths.map((m, mIdx)=><button key={mIdx} onClick={()=>handleActivateMonth(phone, st.name, m)} className="bg-white border-2 border-red-500 text-red-600 px-3 py-1 rounded-lg text-sm">{m}</button>)}</div></div>;
+                                            }))}
+                                        </div>
+                                    </div>
+                                )}
+                                {adminActiveTab === 'settings' && (
+                                    <div className="bg-white rounded-2xl shadow-md overflow-hidden max-w-lg"><div className="bg-gray-50 px-6 py-4 border-b border-gray-200"><h2 className="text-xl font-black text-primary">إعدادات المنصة</h2></div>
+                                        <div className="p-6"><div className="mb-4"><label className="block text-gray-700 font-bold mb-2">قيمة الاشتراك:</label><div className="bg-gray-100 px-4 py-3 rounded-xl font-black text-secondary text-lg border">{platformFee}</div></div>
+                                        <div className="mb-6"><label className="block text-gray-700 font-bold mb-2">تحديث السعر:</label><input type="text" placeholder="مثال: 60 جنيهاً" className="w-full border-2 focus:border-secondary rounded-xl px-4 py-3 text-lg font-bold" value={newFeeInput} onChange={e=>setNewFeeInput(e.target.value)} /></div>
+                                        <button onClick={handleUpdateFee} disabled={!newFeeInput} className="w-full bg-primary text-white font-bold py-3 rounded-xl">حفظ الإعدادات</button></div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return null;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>
