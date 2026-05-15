@@ -68,7 +68,6 @@
 
         const toEasternArabic = (num) => String(num).split('').map(digit => ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'][digit] || digit).join('');
 
-        // دالة مساعدة لاختراق الـ CORS وتأمين إرسال البيانات لجوجل شيت بدون أخطاء
         const postToAPI = async (payload) => {
             try {
                 const response = await fetch(API_URL, {
@@ -206,7 +205,7 @@
 
         const buildCourseData = (flatQuestions) => {
             const course = []; let unitCounter = 1; let lessonCounter = 1;
-            if (!flatQuestions || !Array.isArray(flatQuestions)) return course; // حماية إضافية من انهيار الـ API
+            if (!flatQuestions || !Array.isArray(flatQuestions)) return course; 
             flatQuestions.forEach(row => {
                 const unitTitle = row.unit || "وحدة عامة"; const lessonTitle = row.section || "درس عام";
                 let unit = course.find(u => u.title === unitTitle);
@@ -603,7 +602,7 @@
             useEffect(() => {
                 if (screen === 'result' && activeLesson) {
                     const totalQs = activeLesson.questions.length; 
-                    const correct = userAnswers.filter(a => a.isCorrect).length; 
+                    const correct = userAnswers.filter(a => a && a.isCorrect).length; 
                     const perc = Math.round((correct/totalQs)*100);
                     saveResultToDB({ quizName: activeLesson.title, score: `${perc}%` });
                 }
@@ -851,8 +850,25 @@
             }
 
             if (screen === 'quiz' && activeLesson) {
-                const question = activeLesson.questions[currentQIndex]; const totalQs = activeLesson.questions.length;
-                const isAnswered = userAnswers[currentQIndex] !== undefined; const currentAnswer = userAnswers[currentQIndex];
+                const question = activeLesson.questions[currentQIndex]; 
+                const totalQs = activeLesson.questions.length;
+                
+                // درع حماية: لمنع الشاشة البيضاء إذا كان الدرس فارغاً من الأسئلة أو به خطأ
+                if (!question) {
+                    return (
+                        <div className="h-screen w-full flex flex-col items-center justify-center p-6 bg-gray-50 text-center">
+                            <i className="fas fa-exclamation-triangle text-6xl text-gray-300 mb-4"></i>
+                            <h2 className="text-2xl font-black text-gray-700 mb-2">لا توجد أسئلة متاحة حالياً</h2>
+                            <p className="text-gray-500 font-bold mb-6">هذا الدرس قيد التجهيز وسيتم إضافة أسئلته قريباً.</p>
+                            <button onClick={()=>setScreen('index')} className="bg-primary text-white font-black text-lg py-3 px-8 rounded-full hover:bg-gray-900 transition-colors shadow-lg">
+                                العودة للفهرس <i className="fas fa-arrow-left mr-2"></i>
+                            </button>
+                        </div>
+                    );
+                }
+
+                const isAnswered = !!userAnswers[currentQIndex];
+                const currentAnswer = userAnswers[currentQIndex] || {};
 
                 const handleOptionClick = (option) => {
                     if (isAnswered) return;
@@ -912,7 +928,7 @@
 
                                 {question.type === 'mcq' && (
                                     <div className="flex flex-col gap-4 mb-8">
-                                        {question.options.map((opt, idx) => {
+                                        {(question.options || []).map((opt, idx) => {
                                             let btnClass = "bg-white border-2 p-4 rounded-2xl font-bold text-xl flex items-center shadow-sm cursor-pointer";
                                             if (isAnswered) {
                                                 if (opt === question.correct) btnClass = "bg-green-50 border-green-500 text-green-800 p-4 rounded-2xl font-bold text-xl flex items-center shadow-md";
@@ -948,9 +964,9 @@
 
             if (screen === 'result' && activeLesson) {
                 const totalQs = activeLesson.questions.length; 
-                const correct = userAnswers.filter(a => a.isCorrect).length; 
+                const correct = userAnswers.filter(a => a && a.isCorrect).length; 
                 const perc = Math.round((correct/totalQs)*100);
-                const wrongConcepts = [...new Set(userAnswers.filter(a => !a.isCorrect).map(a => a.concept ? `${a.concept} - (${a.paragraph||'الدرس'})` : `(${a.paragraph||'مراجعة'})`))];
+                const wrongConcepts = [...new Set(userAnswers.filter(a => a && !a.isCorrect).map(a => a.concept ? `${a.concept} - (${a.paragraph||'الدرس'})` : `(${a.paragraph||'مراجعة'})`))];
                 const firstName = studentName ? studentName.split(' ')[0] : 'يا بطل';
 
                 return (
