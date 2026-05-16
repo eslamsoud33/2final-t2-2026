@@ -52,8 +52,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // الرابط الجديد وقاعدة البيانات
-        const API_URL = "https://script.google.com/macros/s/AKfycbyT0G__IDcx3fqNbV39G8WUZo-8S0QXt5JA5motO-Fo0yTkjo6728I8Ie4_da7X9dZf/exec"; 
+        const API_URL = "https://script.google.com/macros/s/AKfycbyprzWcHE3Fi8OGWfEGoVcJTpkXIlTUE0AWgxbRsskP8vwbYrrFwinkAhf5Pv6Xy7_1/exec"; 
         const SECRET_API_KEY = "Kanz_Secret_2026_Secure";
 
         const BASE_STUDENTS = {
@@ -86,7 +85,7 @@
         const wrapRegex = (arr) => new RegExp('([^\\s.,:؛،؟"\'«»“”()\\n\\r\\-]*?(?:' + arr.join('|') + ')[^\\s.,:؛،؟"\'«»“”()\\n\\r\\-]*)', 'gi');
 
         const formatQuestionText = (text) => {
-            if (!text) return text;
+            if (text === null || text === undefined) return "";
             
             let textStr = String(text).replace(/\\n/g, '\n');
             let remainingText = textStr.trim(); 
@@ -163,7 +162,7 @@
         };
 
         const highlightAnswer = (text, concept) => {
-            if (!text) return text;
+            if (text === null || text === undefined) return "";
 
             let textStr = String(text).replace(/\\n/g, '\n');
             let processedText = textStr.replace(/(\s+)?([0-9٠-٩]+\s*[-.]\s*(?![0-9٠-٩]))/g, '\n$2').trim();
@@ -255,16 +254,25 @@
                 if (!unit) { unit = { id: `unit_${unitCounter++}`, title: unitTitle, lessons: [] }; course.push(unit); }
                 let lesson = unit.lessons.find(l => l.title === lessonTitle);
                 if (!lesson) { lesson = { id: `lesson_${lessonCounter++}`, title: lessonTitle, questions: [], completed: false }; unit.lessons.push(lesson); }
-                const options = [row.opt1, row.opt2, row.opt3, row.opt4].filter(o => o && o.toString().trim() !== "");
                 
-                // درع حماية لتنظيف نوع السؤال من المسافات الزائدة ودعم الكتابة بالعربي
+                // درع حماية الأرقام: تحويل جميع الخيارات والإجابات لنصوص صريحة لمنع فشل التطابق (===) مع الأرقام القادمة من الإكسيل
+                const options = [row.opt1, row.opt2, row.opt3, row.opt4]
+                    .filter(o => o !== null && o !== undefined && String(o).trim() !== "")
+                    .map(o => String(o).trim());
+                
                 let rawType = row.type ? String(row.type).trim().toLowerCase() : "mcq";
                 let finalType = (rawType === 'essay' || rawType === 'مقالي' || rawType === 'مقال') ? 'essay' : 'mcq';
 
                 lesson.questions.push({
-                    type: finalType, q: String(row.q), options: options, correct: String(row.correct),
-                    reason: row.reason, answer: row.reason, concept: row.concept,
-                    paragraph: row.paragraph, section: lessonTitle
+                    type: finalType, 
+                    q: row.q !== null && row.q !== undefined ? String(row.q) : "", 
+                    options: options, 
+                    correct: row.correct !== null && row.correct !== undefined ? String(row.correct).trim() : "",
+                    reason: row.reason !== null && row.reason !== undefined ? String(row.reason) : "", 
+                    answer: row.reason !== null && row.reason !== undefined ? String(row.reason) : "", 
+                    concept: row.concept !== null && row.concept !== undefined ? String(row.concept) : "",
+                    paragraph: row.paragraph !== null && row.paragraph !== undefined ? String(row.paragraph) : "", 
+                    section: lessonTitle
                 });
             });
             return course;
@@ -303,6 +311,7 @@
             const [adminError, setAdminError] = useState('');
             
             const [showRegisterModal, setShowRegisterModal] = useState(false);
+            const [registerStep, setRegisterStep] = useState(1);
             const [registerName, setRegisterName] = useState('');
             const [registerMethod, setRegisterMethod] = useState('');
             
@@ -366,9 +375,16 @@
             useEffect(() => {
                 const loadStudents = async () => {
                     try {
-                        const response = await fetch(`${API_URL}?action=getAllStudents&apiKey=${SECRET_API_KEY}`);
-                        const result = await response.json();
-                        if(result.status === 'success') {
+                        let result;
+                        try {
+                            const response = await fetch(`${API_URL}?action=getAllStudents&apiKey=${SECRET_API_KEY}`);
+                            result = await response.json();
+                        } catch(err) {
+                            // نظام جلب مزدوج: في حال منعت متصفحات الموبايل استعلام الـ GET يتم الضرب مباشرة بـ POST للهروب من الجدار الناري
+                            result = await postToAPI({ action: 'getAllStudents' });
+                        }
+                        
+                        if(result && result.status === 'success') {
                             if(result.data) setStudentsList(result.data);
                             if(result.fee) setPlatformFee(result.fee);
                         }
@@ -514,32 +530,37 @@
                         fpData = await fpRes.json();
                     } catch(e) { console.error('Security Check Error:', e); }
                     
-                    if (!fpData) { 
-                        setLoginError('خطأ أمني: يرجى التأكد من اتصال الإنترنت أو إيقاف مانع الإعلانات (AdBlocker).'); 
-                        setIsLoading(false); 
-                        return; 
-                    }
-
-                    if (fpData.status === 'blocked') { 
+                    // إزالة فخ البلوك: إذا كان البلوك صريحاً من السيرفر يمنعه، وإلا يسمح بدخوله لتجنب تعليق الطالب بسبب خطأ إنترنت
+                    if (fpData && fpData.status === 'blocked') { 
                         setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); 
                         setIsLoading(false); 
                         return; 
                     }
 
+                    // هنا منطق الدفع، إذا كان الطالب غير مسدد تظهر النافذة بنجاح
                     if (st?.isPaid || !(st?.missingMonths) || st.missingMonths.length === 0) {
                         try {
                             localStorage.setItem('loggedInUser', JSON.stringify(st));
                             localStorage.setItem('loggedInPhone', formattedPhone);
                         } catch(e) {}
                         await loadQuestionsAndNavigate('welcome');
-                    } else setShowUnpaidModal(true);
+                    } else {
+                        setShowUnpaidModal(true);
+                    }
                     setIsLoading(false); return;
                 }
 
+                // الهروب المزدوج: إذا فشل تحميل قائمة الطلاب مسبقاً، نحاول جلب بينات الطالب هنا بطريقتين (GET ثم POST)
                 try {
-                    const response = await fetch(`${API_URL}?action=login&phone=${formattedPhone}&apiKey=${SECRET_API_KEY}`);
-                    const result = await response.json();
-                    if (result.status === 'success') {
+                    let result;
+                    try {
+                        const response = await fetch(`${API_URL}?action=login&phone=${formattedPhone}&apiKey=${SECRET_API_KEY}`);
+                        result = await response.json();
+                    } catch(err) {
+                        result = await postToAPI({ action: 'login', phone: formattedPhone });
+                    }
+                    
+                    if (result && result.status === 'success') {
                         let fetchedStudents = Array.isArray(result.student) ? result.student : [result.student];
                         if (fetchedStudents.length > 1 && !selectedTwin) {
                             setStudentsList(prev => ({...prev, [formattedPhone]: fetchedStudents}));
@@ -555,13 +576,8 @@
                             fpData = await fpRes.json();
                         } catch(e) { console.error('Security Check Error:', e); }
                         
-                        if (!fpData) { 
-                            setLoginError('خطأ أمني: يرجى التأكد من اتصال الإنترنت أو إيقاف مانع الإعلانات (AdBlocker).'); 
-                            setIsLoading(false); 
-                            return; 
-                        }
-                        
-                        if (fpData.status === 'blocked') { 
+                        // إزالة فخ البلوك
+                        if (fpData && fpData.status === 'blocked') { 
                             setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); 
                             setIsLoading(false); 
                             return; 
@@ -573,13 +589,15 @@
                                 localStorage.setItem('loggedInPhone', formattedPhone);
                             } catch(e) {}
                             await loadQuestionsAndNavigate('welcome');
-                        } else setShowUnpaidModal(true);
-                    } else if (result.status === 'unregistered' || result.message === 'الرقم غير مسجل لدينا.') {
+                        } else {
+                            setShowUnpaidModal(true);
+                        }
+                    } else if (result && (result.status === 'unregistered' || result.message === 'الرقم غير مسجل لدينا.')) {
                         const reqRes = await fetch(`${API_URL}?action=getPendingRequests&apiKey=${SECRET_API_KEY}`); const reqData = await reqRes.json();
                         if (reqData.status === 'success' && reqData.data && reqData.data.some(r => formatPhoneStr(r.phone) === formattedPhone)) setLoginError('طلبك قيد مراجعة الإدارة.');
-                        else setShowRegisterModal(true);
-                    } else setLoginError(result.message || 'حدث خطأ.');
-                } catch (error) { setLoginError('خطأ في الاتصال بالإنترنت.'); }
+                        else { setRegisterStep(1); setShowRegisterModal(true); }
+                    } else setLoginError((result && result.message) || 'حدث خطأ غير معروف.');
+                } catch (error) { setLoginError('خطأ في الاتصال بالإنترنت أو الخادم.'); }
                 setIsLoading(false);
             };
 
@@ -791,6 +809,90 @@
                                     <span className="text-primary font-bold">رؤية وإعداد أ/</span> <span className="text-blue-900 font-black">إسلام سعود</span>
                                 </div>
                             </div>
+
+                            {/* نافذة تسجيل طالب جديد */}
+                            {showRegisterModal && (
+                                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                                    <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-fade-in relative border-t-8 border-secondary">
+                                        <button onClick={() => { setShowRegisterModal(false); setRegisterStep(1); }} className="absolute top-4 left-4 text-gray-400 hover:text-red-500 transition-colors"><i className="fas fa-times text-xl"></i></button>
+                                        
+                                        {registerStep === 1 ? (
+                                            <div className="text-center mt-2">
+                                                <i className="fas fa-handshake text-6xl text-green-500 mb-4 drop-shadow-sm"></i>
+                                                <h3 className="text-2xl font-black text-primary leading-relaxed mb-2">أهلاً بك في منصتك الأولى لضمان الدرجة النهائية!</h3>
+                                                <p className="text-gray-500 font-bold text-sm mb-6">الرقم غير مسجل لدينا، هل تود الاشتراك؟</p>
+                                                <div className="flex gap-3">
+                                                    <button onClick={() => setRegisterStep(2)} className="flex-1 bg-green-500 text-white font-black text-lg py-3 rounded-xl hover:bg-green-600 transition-colors shadow-md">نعم</button>
+                                                    <button onClick={() => { setShowRegisterModal(false); setRegisterStep(1); setInputPhone(''); }} className="flex-1 bg-red-500 text-white font-black text-lg py-3 rounded-xl hover:bg-red-600 transition-colors shadow-md">لا</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="text-center mb-6 mt-2">
+                                                    <i className="fas fa-user-plus text-5xl text-secondary mb-3 drop-shadow-sm"></i>
+                                                    <h3 className="text-2xl font-black text-primary">تسجيل طالب جديد</h3>
+                                                    <p className="text-gray-500 font-bold text-sm mt-2">يرجى إكمال بياناتك لطلب الاشتراك.</p>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700 mb-1.5">اسم الطالب ثلاثي:</label>
+                                                        <input type="text" className="w-full border-2 border-gray-200 focus:border-secondary rounded-xl px-4 py-2.5 font-bold outline-none transition-colors" value={registerName} onChange={e => setRegisterName(e.target.value)} placeholder="اكتب اسمك هنا" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700 mb-1.5">طريقة الدفع (الاشتراك {platformFee}):</label>
+                                                        <select className="w-full border-2 border-gray-200 focus:border-secondary rounded-xl px-4 py-2.5 font-bold outline-none transition-colors text-gray-700" value={registerMethod} onChange={e => setRegisterMethod(e.target.value)}>
+                                                            <option value="">اختر طريقة الدفع...</option>
+                                                            <option value="فودافون كاش">فودافون كاش ({PAYMENT_INFO.vodafoneCash})</option>
+                                                            <option value="انستا باي">انستا باي ({PAYMENT_INFO.instapay})</option>
+                                                        </select>
+                                                    </div>
+                                                    <button onClick={handleRegisterSubmit} className="w-full bg-secondary text-white font-black text-lg py-3 rounded-xl hover:bg-pink-600 transition-colors shadow-md mt-4 flex items-center justify-center gap-2">
+                                                        إرسال طلب الاشتراك <i className="fab fa-whatsapp text-xl"></i>
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* نافذة تنبيه متأخرات الدفع */}
+                            {showUnpaidModal && studentData && (
+                                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+                                    <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl animate-fade-in relative border-t-8 border-red-500">
+                                        <button onClick={() => { setShowUnpaidModal(false); setStudentData(null); setInputPhone(''); }} className="absolute top-4 left-4 text-gray-400 hover:text-red-500 transition-colors"><i className="fas fa-times text-xl"></i></button>
+                                        <div className="text-center mb-6 mt-2">
+                                            <i className="fas fa-exclamation-circle text-5xl text-red-500 mb-3 drop-shadow-sm"></i>
+                                            <h3 className="text-2xl font-black text-primary">تنبيه سداد</h3>
+                                            <p className="text-gray-600 font-bold text-sm mt-2">عفواً يا بطل <span className="text-primary font-black">{studentData.name.split(' ')[0]}</span>، يوجد مصاريف متأخرة.</p>
+                                        </div>
+                                        <div className="bg-red-50 rounded-xl p-4 mb-5 border border-red-100 shadow-inner">
+                                            <div className="flex justify-between items-center mb-2.5">
+                                                <span className="font-bold text-gray-700 text-sm">الشهور المتأخرة:</span>
+                                                <span className="font-black text-red-600 text-sm bg-white px-2 py-0.5 rounded border border-red-200">{studentData.missingMonths.join('، ')}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-2.5 border-t border-red-200">
+                                                <span className="font-bold text-gray-700">المبلغ المطلوب:</span>
+                                                <span className="font-black text-red-600 text-lg">{getUnpaidDetails(studentData.missingMonths).total} جنيهاً</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-1.5">تأكيد طريقة الدفع:</label>
+                                                <select className="w-full border-2 border-gray-200 focus:border-red-400 rounded-xl px-4 py-2.5 font-bold outline-none transition-colors text-gray-700" value={unpaidPaymentMethod} onChange={e => setUnpaidPaymentMethod(e.target.value)}>
+                                                    <option value="">اختر طريقة الدفع...</option>
+                                                    <option value="فودافون كاش">فودافون كاش ({PAYMENT_INFO.vodafoneCash})</option>
+                                                    <option value="انستا باي">انستا باي ({PAYMENT_INFO.instapay})</option>
+                                                </select>
+                                            </div>
+                                            <button onClick={handleUnpaidSubmit} className="w-full bg-red-500 text-white font-black text-lg py-3 rounded-xl hover:bg-red-600 transition-colors shadow-md mt-4 flex items-center justify-center gap-2">
+                                                إرسال إشعار السداد <i className="fab fa-whatsapp text-xl"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
                     </div>
                 );
