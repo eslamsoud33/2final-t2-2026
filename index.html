@@ -52,7 +52,8 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        const API_URL = "https://script.google.com/macros/s/AKfycbyCPJO_nKteNYqDn91elXGJODC6_OLjRNowOoM1tPGDCCS9SEQMLJmGSzBJ8wtzjPsR/exec"; 
+        // الرابط الجديد وقاعدة البيانات
+        const API_URL = "https://script.google.com/macros/s/AKfycbyT0G__IDcx3fqNbV39G8WUZo-8S0QXt5JA5motO-Fo0yTkjo6728I8Ie4_da7X9dZf/exec"; 
         const SECRET_API_KEY = "Kanz_Secret_2026_Secure";
 
         const BASE_STUDENTS = {
@@ -82,14 +83,13 @@
             }
         };
 
-        // دالة مساعدة لاصطياد الكلمة بالكامل بدون تجزئة (بمصر، والعثمانية)
         const wrapRegex = (arr) => new RegExp('([^\\s.,:؛،؟"\'«»“”()\\n\\r\\-]*?(?:' + arr.join('|') + ')[^\\s.,:؛،؟"\'«»“”()\\n\\r\\-]*)', 'gi');
 
         const formatQuestionText = (text) => {
             if (!text) return text;
             
             let textStr = String(text).replace(/\\n/g, '\n');
-            let remainingText = textStr.trim(); // الأسئلة تظل متجاورة ولا نكسر سطر الأرقام فيها
+            let remainingText = textStr.trim(); 
 
             const startersRegex = /^\s*(بم\s*تفسر|ما\s*النتائج(?:\s*المترتبة\s*عل[يى])?|ماذا\s*يحدث(?:\s*(?:لو|اذا|إذا))?|ما\s*رأيك(?:\s*ف[يى])?|ما\s*مقترحات(?:ك)?|هل\s*العبارة\s*صحيحة\s*[اأ]م\s*(?:خاطئة|خطأ)(?:\s*مع\s*التعليل)?|(?:بال[اأ]دلة\s*)?حدد(?:\s*مد[يى])?\s*صحة\s*[اأ]و\s*خطأ(?:\s*العبارة(?:\s*التالية)?)?|[اأ]يد(?:\s*صحة\s*[اأ]و\s*خطأ(?:\s*العبارة)?)?(?:\s*بال[اأ]دلة)?|دلل(?:\s*تاريخيا|\s*جغرافيا)?|قارن(?:\s*بين)?|ما\s*العلاقة(?:\s*بين)?|ضع\s*علامة(?:\s*صح\s*[اأ]و\s*خطأ)?|صوب|اكتب|[اأ]كمل|ما\s*المقصود(?:\s*بـ?)?|برهن|وضح|اختر)\s*[:؛؟?-]?\s*/i;
             const match = remainingText.match(startersRegex);
@@ -119,7 +119,6 @@
 
             elements = processElements(elements, /(\r?\n)/g, 'newline');
             
-            // تلوين الكلمة الأولى بعد الترقيم باللون الأحمر
             let numberedElems = [];
             elements.forEach(el => {
                 if (el.type !== 'text') { numberedElems.push(el); return; }
@@ -167,7 +166,6 @@
             if (!text) return text;
 
             let textStr = String(text).replace(/\\n/g, '\n');
-            // كسر سطر جديد للأرقام في الإجابة والتعليل لعدم تجاورها (كما طلبت مسبقاً)
             let processedText = textStr.replace(/(\s+)?([0-9٠-٩]+\s*[-.]\s*(?![0-9٠-٩]))/g, '\n$2').trim();
 
             const places = ['مصر', 'آسيا', 'أوروبا', 'إفريقيا', 'الوطن العربي', 'الشام', 'العراق', 'فلسطين'];
@@ -188,7 +186,6 @@
 
             elements = processElements(elements, /(\r?\n)/g, 'newline');
             
-            // تلوين الكلمة الأولى بعد الترقيم باللون الأحمر
             let numberedElems = [];
             elements.forEach(el => {
                 if (el.type !== 'text') { numberedElems.push(el); return; }
@@ -332,7 +329,6 @@
             const [showResetModal, setShowResetModal] = useState(false);
             const [studentsList, setStudentsList] = useState({});
             
-            // إضافة حالة جديدة للتحكم في انسدال نتائج الطالب في لوحة الإدارة
             const [expandedAdminStudent, setExpandedAdminStudent] = useState(null);
             
             const touchStartX = useRef(null);
@@ -507,12 +503,18 @@
                     setStudentName(st?.name || ''); setStudentData(st);
                     
                     const fingerprint = generateDeviceFingerprint();
-                    let fpData = { status: 'success' };
+                    let fpData = null; 
                     try {
-                        const fpRes = await fetch(`${API_URL}?action=saveDeviceFingerprint&phone=${encodeURIComponent(formattedPhone + '_' + (st?.name || ''))}&fingerprint=${encodeURIComponent(fingerprint)}&apiKey=${SECRET_API_KEY}`);
+                        const fpRes = await fetch(`${API_URL}?action=saveDeviceFingerprint&phone=${encodeURIComponent(formattedPhone + '_' + (st?.name || ''))}&fingerprint=${encodeURIComponent(fingerprint)}&apiKey=${SECRET_API_KEY}&_t=${Date.now()}`);
                         fpData = await fpRes.json();
-                    } catch(e) { console.error('Fingerprint bypass:', e); }
+                    } catch(e) { console.error('Security Check Error:', e); }
                     
+                    if (!fpData) { 
+                        setLoginError('خطأ أمني: يرجى التأكد من اتصال الإنترنت أو إيقاف مانع الإعلانات (AdBlocker).'); 
+                        setIsLoading(false); 
+                        return; 
+                    }
+
                     if (fpData.status === 'blocked') { 
                         setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); 
                         setIsLoading(false); 
@@ -542,11 +544,17 @@
                         setStudentName(st?.name || ''); setStudentData(st);
                         
                         const fingerprint = generateDeviceFingerprint();
-                        let fpData = { status: 'success' };
+                        let fpData = null; 
                         try {
-                            const fpRes = await fetch(`${API_URL}?action=saveDeviceFingerprint&phone=${encodeURIComponent(formattedPhone + '_' + (st?.name || ''))}&fingerprint=${encodeURIComponent(fingerprint)}&apiKey=${SECRET_API_KEY}`);
+                            const fpRes = await fetch(`${API_URL}?action=saveDeviceFingerprint&phone=${encodeURIComponent(formattedPhone + '_' + (st?.name || ''))}&fingerprint=${encodeURIComponent(fingerprint)}&apiKey=${SECRET_API_KEY}&_t=${Date.now()}`);
                             fpData = await fpRes.json();
-                        } catch(e) { console.error('Fingerprint bypass:', e); }
+                        } catch(e) { console.error('Security Check Error:', e); }
+                        
+                        if (!fpData) { 
+                            setLoginError('خطأ أمني: يرجى التأكد من اتصال الإنترنت أو إيقاف مانع الإعلانات (AdBlocker).'); 
+                            setIsLoading(false); 
+                            return; 
+                        }
                         
                         if (fpData.status === 'blocked') { 
                             setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); 
@@ -675,7 +683,7 @@
                                 {isLoading ? <i className="fas fa-spinner fa-spin"></i> : 'تأكيد (نعم مستعد) 🚀'}
                             </button>
                             <button onClick={handleLogout} className="text-gray-500 font-bold text-sm underline hover:text-red-500 mt-2 relative z-10">
-                                تسجيل خروج (لست {studentName.split(' ')[0]})
+                                تسجيل خروج (لست {String(studentName || '').split(' ')[0]})
                             </button>
                         </div>
                     </div>
@@ -944,26 +952,23 @@
                     const newAns = [...userAnswers]; newAns[currentQIndex] = { isCorrect: true, concept: question.concept, paragraph: question.paragraph, type: 'essay' }; setUserAnswers(newAns);
                 };
 
-                // دوال اللمس والتمرير الذكية (Swipe Logic)
                 const handleTouchStart = (e) => {
                     touchStartX.current = e.targetTouches[0].clientX;
                 };
 
                 const handleTouchEnd = (e) => {
-                    if (isDrawingMode) return; // منع التمرير أثناء تشغيل القلم
+                    if (isDrawingMode) return; 
                     touchEndX.current = e.changedTouches[0].clientX;
                     
                     if (touchStartX.current === null || touchEndX.current === null) return;
                     const diff = touchStartX.current - touchEndX.current;
                     
                     if (diff > 50) { 
-                        // سحب يسار -> التالي
                         if (isAnswered) {
                             if (currentQIndex < totalQs - 1) setCurrentQIndex(currentQIndex + 1);
                             else setScreen('result');
                         }
                     } else if (diff < -50) { 
-                        // سحب يمين -> السابق
                         if (currentQIndex > 0) setCurrentQIndex(currentQIndex - 1);
                     }
                     
@@ -1155,7 +1160,6 @@
                                     <div className="bg-white rounded-2xl shadow-md overflow-hidden">
                                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200"><h2 className="text-xl font-black text-primary">النتائج الحية</h2></div>
                                         <div className="p-4 space-y-3">
-                                            {/* تجميع الطلاب، ترتيبهم أبجدياً، وجعلهم في قائمة تفاعلية منسدلة */}
                                             {Object.values(adminResults.reduce((acc, res) => {
                                                 if (!acc[res.phone]) acc[res.phone] = { name: res.name, phone: res.phone, results: [] };
                                                 acc[res.phone].results.push(res);
