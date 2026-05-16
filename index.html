@@ -256,8 +256,13 @@
                 let lesson = unit.lessons.find(l => l.title === lessonTitle);
                 if (!lesson) { lesson = { id: `lesson_${lessonCounter++}`, title: lessonTitle, questions: [], completed: false }; unit.lessons.push(lesson); }
                 const options = [row.opt1, row.opt2, row.opt3, row.opt4].filter(o => o && o.toString().trim() !== "");
+                
+                // درع حماية لتنظيف نوع السؤال من المسافات الزائدة ودعم الكتابة بالعربي
+                let rawType = row.type ? String(row.type).trim().toLowerCase() : "mcq";
+                let finalType = (rawType === 'essay' || rawType === 'مقالي' || rawType === 'مقال') ? 'essay' : 'mcq';
+
                 lesson.questions.push({
-                    type: row.type || "mcq", q: String(row.q), options: options, correct: String(row.correct),
+                    type: finalType, q: String(row.q), options: options, correct: String(row.correct),
                     reason: row.reason, answer: row.reason, concept: row.concept,
                     paragraph: row.paragraph, section: lessonTitle
                 });
