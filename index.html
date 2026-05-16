@@ -901,15 +901,15 @@
             if (screen === 'index') {
                 return (
                     <div className="h-screen flex flex-col watermark-container bg-gray-50">
-                        <div className="bg-white shadow-sm px-4 py-4 z-10 border-b-2 flex flex-col lg:flex-row justify-between items-center gap-4 w-full">
-                            <div className="flex items-center gap-3 shrink-0 w-full lg:w-auto justify-start">
-                                <i className="fas fa-graduation-cap text-4xl sm:text-5xl text-secondary shrink-0"></i>
-                                <div className="flex flex-col items-start text-right">
-                                    <div className="flex items-center gap-1 font-black text-2xl sm:text-3xl leading-none mb-1">
+                        <div className="bg-white shadow-sm px-3 sm:px-4 py-3 sm:py-4 z-50 sticky top-0 shrink-0 border-b-2 flex flex-col lg:flex-row justify-between items-center gap-3 sm:gap-4 w-full">
+                            <div className="flex items-center gap-2 sm:gap-3 shrink-0 w-full lg:w-auto justify-center lg:justify-start">
+                                <i className="fas fa-graduation-cap text-3xl sm:text-5xl text-secondary shrink-0"></i>
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="flex items-center gap-1 font-black text-xl sm:text-3xl leading-none mb-1">
                                         <span className="text-secondary">موسوعة</span>
                                         <span className="text-primary">الكنز التعليمي</span>
                                     </div>
-                                    <div className="text-[11px] sm:text-xs font-bold flex gap-1">
+                                    <div className="text-[10px] sm:text-xs font-bold flex justify-center gap-1">
                                         <span className="text-secondary">رؤية وإعداد أ/</span>
                                         <span className="text-blue-900">إسلام سعود</span>
                                     </div>
@@ -917,47 +917,47 @@
                             </div>
 
                             <div className="flex flex-col gap-3 shrink-0 w-full lg:w-auto">
-                                <div className="flex justify-center lg:justify-end items-center gap-2 overflow-x-auto custom-scrollbar pb-1 w-full" dir="rtl">
+                                <div className="flex flex-wrap justify-center lg:justify-end items-center gap-2 w-full" dir="rtl">
                                     {((BASE_STUDENTS[formatPhoneStr(inputPhone)] || {}).role === 'admin') && (
-                                        <button onClick={() => setScreen('admin')} className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-4 py-1.5 rounded-full text-sm font-black flex items-center gap-2 shrink-0 shadow-sm hover:bg-blue-100 transition-colors">
+                                        <button onClick={() => setScreen('admin')} className="bg-[#eff6ff] text-[#2563eb] border border-[#bfdbfe] px-3 py-1.5 rounded-full text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 shadow-sm hover:bg-blue-100 transition-colors">
                                             الإدارة <i className="fas fa-user-shield"></i>
                                         </button>
                                     )}
-                                    <button onClick={() => setShowResetModal(true)} className="bg-[#fff1f2] text-[#ef4444] border border-[#fecaca] px-4 py-1.5 rounded-full text-sm font-black flex items-center gap-2 shrink-0 shadow-sm hover:bg-red-50 transition-colors">
+                                    <button onClick={() => setShowResetModal(true)} className="bg-[#fff1f2] text-[#ef4444] border border-[#fecaca] px-3 py-1.5 rounded-full text-xs sm:text-sm font-black flex items-center gap-1.5 shrink-0 shadow-sm hover:bg-red-50 transition-colors">
                                         تصفير <i className="fas fa-sync-alt"></i>
                                     </button>
-                                    <div className="bg-[#f8fafc] text-[#334155] border border-[#e2e8f0] px-4 py-1.5 rounded-full text-sm font-black shrink-0 shadow-sm">
+                                    <div className="bg-[#f8fafc] text-[#334155] border border-[#e2e8f0] px-3 py-1.5 rounded-full text-xs sm:text-sm font-black shrink-0 shadow-sm">
                                         {gradeName}
                                     </div>
-                                    <button onClick={handleLogout} className="text-red-500 hover:text-white hover:bg-red-500 bg-red-50 px-3 py-1.5 rounded-full text-xs font-bold transition-colors border border-red-100 shadow-sm flex items-center gap-1 shrink-0 mr-auto lg:mr-2">
+                                    <button onClick={handleLogout} className="text-red-500 hover:text-white hover:bg-red-500 bg-red-50 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-colors border border-red-100 shadow-sm flex items-center gap-1 shrink-0 lg:mr-2">
                                         خروج <i className="fas fa-sign-out-alt"></i>
                                     </button>
                                 </div>
 
-                                <div className="flex justify-center lg:justify-end items-stretch gap-2 w-full" dir="rtl">
-                                    <div className="flex-1 lg:flex-none lg:w-24 bg-[#050505] text-white rounded-xl py-2 px-1 flex flex-col items-center justify-center shadow-md">
-                                        <div className="text-[10px] sm:text-xs font-bold text-gray-300 mb-0.5">التقدم</div>
-                                        <div className="text-sm sm:text-base font-black flex items-center gap-0.5 text-secondary" dir="ltr">
+                                <div className="flex justify-center lg:justify-end items-stretch gap-1.5 sm:gap-2 w-full" dir="rtl">
+                                    <div className="flex-1 lg:flex-none lg:w-24 bg-[#050505] text-white rounded-xl py-1.5 sm:py-2 px-1 flex flex-col items-center justify-center shadow-md">
+                                        <div className="text-[9px] sm:text-xs font-bold text-gray-300 mb-0.5">التقدم</div>
+                                        <div className="text-xs sm:text-base font-black flex items-center gap-0.5 text-secondary" dir="ltr">
                                             <span>%</span><span>{toEasternArabic(stats.progress)}</span>
                                         </div>
                                     </div>
-                                    <button onClick={()=>setActiveFilter('all')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-2 px-1 flex flex-col items-center justify-center shadow-md transition-all ${activeFilter==='all'?'bg-secondary text-white ring-2 ring-offset-1 ring-secondary':'bg-secondary text-white opacity-90'}`}>
-                                        <div className="text-[10px] sm:text-xs font-bold text-pink-100 mb-0.5">إجمالي الدروس</div>
-                                        <div className="text-sm sm:text-base font-black">{toEasternArabic(stats.total)}</div>
+                                    <button onClick={()=>setActiveFilter('all')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-1.5 sm:py-2 px-1 flex flex-col items-center justify-center shadow-md transition-all ${activeFilter==='all'?'bg-secondary text-white ring-2 ring-offset-1 ring-secondary':'bg-secondary text-white opacity-90'}`}>
+                                        <div className="text-[9px] sm:text-xs font-bold text-pink-100 mb-0.5">إجمالي الدروس</div>
+                                        <div className="text-xs sm:text-base font-black">{toEasternArabic(stats.total)}</div>
                                     </button>
-                                    <button onClick={()=>setActiveFilter('completed')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-2 px-1 flex flex-col items-center justify-center border shadow-sm transition-all ${activeFilter==='completed'?'bg-green-50 border-green-500 ring-1 ring-green-500':'bg-white border-gray-200 hover:border-green-400'}`}>
-                                        <div className="text-[10px] sm:text-xs font-bold text-green-500 mb-0.5">المنجز</div>
-                                        <div className="text-sm sm:text-base font-black text-green-500">{toEasternArabic(stats.completed)}</div>
+                                    <button onClick={()=>setActiveFilter('completed')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-1.5 sm:py-2 px-1 flex flex-col items-center justify-center border shadow-sm transition-all ${activeFilter==='completed'?'bg-green-50 border-green-500 ring-1 ring-green-500':'bg-white border-gray-200 hover:border-green-400'}`}>
+                                        <div className="text-[9px] sm:text-xs font-bold text-green-500 mb-0.5">المنجز</div>
+                                        <div className="text-xs sm:text-base font-black text-green-500">{toEasternArabic(stats.completed)}</div>
                                     </button>
-                                    <button onClick={()=>setActiveFilter('remaining')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-2 px-1 flex flex-col items-center justify-center shadow-md transition-all ${activeFilter==='remaining'?'bg-red-600 text-white ring-2 ring-offset-1 ring-red-600':'bg-[#ef4444] text-white hover:bg-red-600'}`}>
-                                        <div className="text-[10px] sm:text-xs font-bold text-white mb-0.5">المتبقي</div>
-                                        <div className="text-sm sm:text-base font-black text-white">{toEasternArabic(stats.remaining)}</div>
+                                    <button onClick={()=>setActiveFilter('remaining')} className={`flex-1 lg:flex-none lg:w-24 rounded-xl py-1.5 sm:py-2 px-1 flex flex-col items-center justify-center shadow-md transition-all ${activeFilter==='remaining'?'bg-red-600 text-white ring-2 ring-offset-1 ring-red-600':'bg-[#ef4444] text-white hover:bg-red-600'}`}>
+                                        <div className="text-[9px] sm:text-xs font-bold text-white mb-0.5">المتبقي</div>
+                                        <div className="text-xs sm:text-base font-black text-white">{toEasternArabic(stats.remaining)}</div>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 z-10">
+                        <div className="flex-1 overflow-y-auto p-4 pt-8 z-10">
                             <div className="max-w-4xl mx-auto space-y-4">
                                 {data.map(unit => {
                                     if (unit.lessons.length === 0) return null;
@@ -1091,45 +1091,45 @@
                     >
                         <DrawingCanvas isEnabled={isDrawingMode} />
                         
-                        <div className={`shadow-md px-2 sm:px-4 py-2 flex justify-between items-center z-40 border-b-4 border-primary ${isDarkMode?'bg-gray-800':'bg-white'}`}>
-                            <div className="flex items-center gap-2 shrink-0 justify-start">
+                        <div className={`shadow-md px-2 sm:px-4 py-2 flex justify-between items-center z-50 sticky top-0 shrink-0 w-full border-b-4 border-primary ${isDarkMode?'bg-gray-800':'bg-white'}`}>
+                            <div className="flex items-center gap-1 sm:gap-2 shrink-0 justify-start">
                                 <i className={`fas fa-graduation-cap text-xl sm:text-3xl shrink-0 ${isDarkMode?'text-gray-100':'text-secondary'}`}></i>
-                                <div className="flex flex-col hidden sm:flex items-start text-right">
-                                    <div className="flex items-center gap-1 font-black text-sm sm:text-lg leading-none mb-0.5">
+                                <div className="flex flex-col items-center text-center">
+                                    <div className="flex items-center gap-1 font-black text-[10px] sm:text-lg leading-none mb-0.5">
                                         <span className={isDarkMode?'text-secondary':'text-secondary'}>موسوعة</span>
                                         <span className={isDarkMode?'text-gray-100':'text-primary'}>الكنز التعليمي</span>
                                     </div>
-                                    <div className="text-[8px] sm:text-[10px] font-bold flex gap-1">
+                                    <div className="text-[7px] sm:text-[10px] font-bold flex justify-center gap-1">
                                         <span className={isDarkMode?'text-secondary':'text-secondary'}>رؤية وإعداد أ/</span>
                                         <span className={isDarkMode?'text-blue-300':'text-blue-900'}>إسلام سعود</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className={`flex items-center justify-center px-4 sm:px-6 py-1.5 sm:py-2 rounded-full shadow-inner border shrink-0 mx-2 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'}`}>
-                                <div className="flex items-center gap-2" dir="ltr">
-                                    <div className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-white shadow-sm'}`}>
-                                        <i className={`fas fa-tasks text-xs sm:text-sm ${isDarkMode ? 'text-gray-300' : 'text-secondary'}`}></i>
+                            <div className={`flex items-center justify-center px-2 sm:px-6 py-1 sm:py-2 rounded-full shadow-inner border shrink-0 mx-1 sm:mx-2 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'}`}>
+                                <div className="flex items-center gap-1 sm:gap-2" dir="ltr">
+                                    <div className={`flex items-center justify-center w-5 h-5 sm:w-8 sm:h-8 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-white shadow-sm'}`}>
+                                        <i className={`fas fa-tasks text-[10px] sm:text-sm ${isDarkMode ? 'text-gray-300' : 'text-secondary'}`}></i>
                                     </div>
-                                    <div className={`font-black text-sm sm:text-lg flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-primary'}`}>
-                                        <span className="text-secondary text-lg sm:text-2xl">{toEasternArabic(currentQIndex + 1)}</span>
+                                    <div className={`font-black text-xs sm:text-lg flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-primary'}`}>
+                                        <span className="text-secondary text-sm sm:text-2xl">{toEasternArabic(currentQIndex + 1)}</span>
                                         <span className="opacity-50 pb-1">/</span>
-                                        <span className="text-sm sm:text-base">{toEasternArabic(totalQs)}</span>
+                                        <span className="text-xs sm:text-base">{toEasternArabic(totalQs)}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                <button onClick={toggleFullscreen} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isFullscreen?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className={`fas ${isFullscreen?'fa-compress':'fa-expand'}`}></i></button>
-                                <button onClick={()=>setIsDrawingMode(!isDrawingMode)} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isDrawingMode?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className="fas fa-pen"></i></button>
-                                <button onClick={()=>setIsDarkMode(!isDarkMode)} className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isDarkMode?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className={`fas ${isDarkMode?'fa-sun':'fa-moon'}`}></i></button>
-                                <button onClick={()=>setScreen('index')} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-50 flex items-center justify-center text-xs sm:text-base text-red-600 hover:bg-red-500 hover:text-white transition-colors"><i className="fas fa-home"></i></button>
+                                <button onClick={toggleFullscreen} className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isFullscreen?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className={`fas ${isFullscreen?'fa-compress':'fa-expand'}`}></i></button>
+                                <button onClick={()=>setIsDrawingMode(!isDrawingMode)} className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isDrawingMode?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className="fas fa-pen"></i></button>
+                                <button onClick={()=>setIsDarkMode(!isDarkMode)} className={`w-7 h-7 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-base transition-colors ${isDarkMode?'bg-secondary text-white':'bg-gray-100 text-primary hover:bg-gray-200'}`}><i className={`fas ${isDarkMode?'fa-sun':'fa-moon'}`}></i></button>
+                                <button onClick={()=>setScreen('index')} className="w-7 h-7 sm:w-10 sm:h-10 rounded-full bg-red-50 flex items-center justify-center text-xs sm:text-base text-red-600 hover:bg-red-500 hover:text-white transition-colors"><i className="fas fa-home"></i></button>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 z-10 flex flex-col">
+                        <div className="flex-1 overflow-y-auto p-4 pt-12 z-10 flex flex-col">
                             <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col justify-center">
-                                <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 relative border-2 mt-4">
+                                <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 relative border-2 mt-8">
                                     <div className="absolute -top-4 right-8 bg-secondary text-white font-bold px-4 py-1 rounded-full">سؤال {toEasternArabic(currentQIndex+1)}</div>
                                     <h2 className="text-2xl font-bold text-primary mt-2 leading-relaxed">{formatQuestionText(question.q)}</h2>
                                 </div>
@@ -1237,12 +1237,12 @@
                         <div className="bg-primary text-white p-4 flex justify-between items-center z-10 border-b-4 border-secondary flex-wrap gap-y-3">
                             <div className="flex items-center gap-3 shrink-0 justify-start">
                                 <i className="fas fa-graduation-cap text-3xl sm:text-4xl text-secondary shrink-0"></i>
-                                <div className="flex flex-col items-start text-right">
+                                <div className="flex flex-col items-center text-center">
                                     <div className="flex items-center gap-1 font-black text-xl sm:text-2xl leading-none mb-1">
                                         <span className="text-secondary">موسوعة</span>
                                         <span className="text-white">الكنز التعليمي</span>
                                     </div>
-                                    <div className="text-[10px] sm:text-xs font-bold flex gap-1">
+                                    <div className="text-[10px] sm:text-xs font-bold flex justify-center gap-1">
                                         <span className="text-secondary">رؤية وإعداد أ/</span>
                                         <span className="text-gray-300">إسلام سعود</span>
                                     </div>
