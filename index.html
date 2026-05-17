@@ -339,6 +339,9 @@
             
             const [expandedAdminStudent, setExpandedAdminStudent] = useState(null);
             
+            const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
+            const [pendingBackAction, setPendingBackAction] = useState(null);
+            
             const touchStartX = useRef(null);
             const touchEndX = useRef(null);
 
@@ -346,26 +349,13 @@
                 window.history.pushState({ screen: screen }, '');
                 const handlePopState = (e) => {
                     if (screen === 'quiz') {
-                        if (window.confirm('هل أنت متأكد من مغادرة الاختبار والعودة للفهرس؟\n(سيتم حفظ تقدمك تلقائياً)')) {
-                            setScreen('index');
-                        } else {
-                            window.history.pushState({ screen: screen }, '');
-                        }
+                        setPendingBackAction('leave_quiz');
+                        setShowBackConfirmModal(true);
+                        window.history.pushState({ screen: screen }, '');
                     } else if (screen === 'index') {
-                        if (window.confirm('هل تود تسجيل الخروج والعودة للرئيسية؟')) {
-                            try {
-                                localStorage.removeItem('loggedInUser');
-                                localStorage.removeItem('loggedInPhone');
-                            } catch(err) {}
-                            setStudentData(null);
-                            setStudentName('');
-                            setInputPhone('');
-                            setInputPassword('');
-                            setShowPasswordInput(false);
-                            setScreen('home');
-                        } else {
-                            window.history.pushState({ screen: screen }, '');
-                        }
+                        setPendingBackAction('logout');
+                        setShowBackConfirmModal(true);
+                        window.history.pushState({ screen: screen }, '');
                     } else if (screen === 'result') {
                         setScreen('index');
                     } else if (screen === 'admin') {
@@ -377,6 +367,30 @@
                 window.addEventListener('popstate', handlePopState);
                 return () => window.removeEventListener('popstate', handlePopState);
             }, [screen]);
+
+            const confirmBackAction = () => {
+                setShowBackConfirmModal(false);
+                if (pendingBackAction === 'leave_quiz') {
+                    setScreen('index');
+                } else if (pendingBackAction === 'logout') {
+                    try {
+                        localStorage.removeItem('loggedInUser');
+                        localStorage.removeItem('loggedInPhone');
+                    } catch(err) {}
+                    setStudentData(null);
+                    setStudentName('');
+                    setInputPhone('');
+                    setInputPassword('');
+                    setShowPasswordInput(false);
+                    setScreen('home');
+                }
+                setPendingBackAction(null);
+            };
+
+            const cancelBackAction = () => {
+                setShowBackConfirmModal(false);
+                setPendingBackAction(null);
+            };
 
             useEffect(() => {
                 if (screen === 'quiz' && activeLesson && !activeLesson.id?.startsWith('virtual_')) {
@@ -1042,6 +1056,20 @@
                                 </div>
                             </div>
                         )}
+
+                        {showBackConfirmModal && pendingBackAction === 'logout' && (
+                            <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+                                <div className="bg-white rounded-3xl p-6 md:p-8 max-w-[320px] w-full shadow-2xl text-center animate-fade-in flex flex-col items-center">
+                                    <div className="w-16 h-16 bg-[#212b36] text-white rounded-full flex items-center justify-center text-3xl font-black mb-6 shadow-md"><i className="fas fa-sign-out-alt"></i></div>
+                                    <h2 className="text-xl md:text-2xl font-black text-gray-800 mb-2 leading-snug">هل تود تسجيل<br/>الخروج؟</h2>
+                                    <p className="text-gray-800 font-bold mb-8 text-base">والعودة للشاشة الرئيسية.</p>
+                                    <div className="flex gap-3 w-full">
+                                        <button onClick={confirmBackAction} className="flex-1 bg-blue-500 text-white font-black text-lg py-3 rounded-xl hover:bg-blue-600 transition-colors">تأكيد</button>
+                                        <button onClick={cancelBackAction} className="flex-1 bg-gray-200 text-gray-800 font-black text-lg py-3 rounded-xl hover:bg-gray-300 transition-colors">إلغاء</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             }
@@ -1182,6 +1210,20 @@
                                 </div>
                             </div>
                         </div>
+
+                        {showBackConfirmModal && pendingBackAction === 'leave_quiz' && (
+                            <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+                                <div className="bg-white rounded-3xl p-6 md:p-8 max-w-[320px] w-full shadow-2xl text-center animate-fade-in flex flex-col items-center">
+                                    <div className="w-16 h-16 bg-[#212b36] text-white rounded-full flex items-center justify-center text-4xl font-black mb-6 shadow-md">?</div>
+                                    <h2 className="text-xl md:text-2xl font-black text-gray-800 mb-2 leading-snug">هل أنت متأكد من مغادرة<br/>الاختبار؟</h2>
+                                    <p className="text-gray-800 font-bold mb-8 text-lg">سيتم حفظ تقدمك الحالي.</p>
+                                    <div className="flex gap-3 w-full">
+                                        <button onClick={confirmBackAction} className="flex-1 bg-blue-500 text-white font-black text-lg py-3 rounded-xl hover:bg-blue-600 transition-colors">تأكيد</button>
+                                        <button onClick={cancelBackAction} className="flex-1 bg-gray-200 text-gray-800 font-black text-lg py-3 rounded-xl hover:bg-gray-300 transition-colors">إلغاء</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 );
             }
