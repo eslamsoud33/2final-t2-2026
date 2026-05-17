@@ -5,16 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>موسوعة الكنز التعليمي - دراسات اجتماعية</title>
     
-    <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 
     <script>
@@ -255,7 +250,6 @@
                 let lesson = unit.lessons.find(l => l.title === lessonTitle);
                 if (!lesson) { lesson = { id: `lesson_${lessonCounter++}`, title: lessonTitle, questions: [], completed: false }; unit.lessons.push(lesson); }
                 
-                // درع حماية الأرقام: تحويل جميع الخيارات والإجابات لنصوص صريحة لمنع فشل التطابق (===) مع الأرقام القادمة من الإكسيل
                 const options = [row.opt1, row.opt2, row.opt3, row.opt4]
                     .filter(o => o !== null && o !== undefined && String(o).trim() !== "")
                     .map(o => String(o).trim());
@@ -349,19 +343,43 @@
             const touchEndX = useRef(null);
 
             useEffect(() => {
-                window.history.pushState({ screen: 'home' }, '');
-                const handlePopState = () => {
-                    if (screen === 'quiz') setScreen('index');
-                    else if (screen === 'index') setScreen('home');
-                    else if (screen === 'result') setScreen('index');
-                    else window.history.pushState(null, ''); 
+                window.history.pushState({ screen: screen }, '');
+                const handlePopState = (e) => {
+                    if (screen === 'quiz') {
+                        if (window.confirm('هل أنت متأكد من مغادرة الاختبار والعودة للفهرس؟\n(سيتم حفظ تقدمك تلقائياً)')) {
+                            setScreen('index');
+                        } else {
+                            window.history.pushState({ screen: screen }, '');
+                        }
+                    } else if (screen === 'index') {
+                        if (window.confirm('هل تود تسجيل الخروج والعودة للرئيسية؟')) {
+                            try {
+                                localStorage.removeItem('loggedInUser');
+                                localStorage.removeItem('loggedInPhone');
+                            } catch(err) {}
+                            setStudentData(null);
+                            setStudentName('');
+                            setInputPhone('');
+                            setInputPassword('');
+                            setShowPasswordInput(false);
+                            setScreen('home');
+                        } else {
+                            window.history.pushState({ screen: screen }, '');
+                        }
+                    } else if (screen === 'result') {
+                        setScreen('index');
+                    } else if (screen === 'admin') {
+                        setScreen('index');
+                    } else {
+                        window.history.pushState({ screen: screen }, '');
+                    }
                 };
                 window.addEventListener('popstate', handlePopState);
                 return () => window.removeEventListener('popstate', handlePopState);
             }, [screen]);
 
             useEffect(() => {
-                if (screen === 'quiz' && activeLesson) {
+                if (screen === 'quiz' && activeLesson && !activeLesson.id?.startsWith('virtual_')) {
                     const sessionData = { lessonId: activeLesson.id, unitId: data.find(u => u.lessons.some(l => l.id === activeLesson.id))?.id, answers: userAnswers, currentIndex: currentQIndex };
                     try { localStorage.setItem('savedSession', JSON.stringify(sessionData)); } catch(e) {}
                     const handleBeforeUnload = (e) => { e.returnValue = 'مغادرة الاختبار؟'; };
@@ -380,7 +398,6 @@
                             const response = await fetch(`${API_URL}?action=getAllStudents&apiKey=${SECRET_API_KEY}`);
                             result = await response.json();
                         } catch(err) {
-                            // نظام جلب مزدوج: في حال منعت متصفحات الموبايل استعلام الـ GET يتم الضرب مباشرة بـ POST للهروب من الجدار الناري
                             result = await postToAPI({ action: 'getAllStudents' });
                         }
                         
@@ -530,14 +547,12 @@
                         fpData = await fpRes.json();
                     } catch(e) { console.error('Security Check Error:', e); }
                     
-                    // إزالة فخ البلوك: إذا كان البلوك صريحاً من السيرفر يمنعه، وإلا يسمح بدخوله لتجنب تعليق الطالب بسبب خطأ إنترنت
                     if (fpData && fpData.status === 'blocked') { 
                         setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); 
                         setIsLoading(false); 
                         return; 
                     }
 
-                    // هنا منطق الدفع، إذا كان الطالب غير مسدد تظهر النافذة بنجاح
                     if (st?.isPaid || !(st?.missingMonths) || st.missingMonths.length === 0) {
                         try {
                             localStorage.setItem('loggedInUser', JSON.stringify(st));
@@ -550,7 +565,6 @@
                     setIsLoading(false); return;
                 }
 
-                // الهروب المزدوج: إذا فشل تحميل قائمة الطلاب مسبقاً، نحاول جلب بينات الطالب هنا بطريقتين (GET ثم POST)
                 try {
                     let result;
                     try {
@@ -576,7 +590,6 @@
                             fpData = await fpRes.json();
                         } catch(e) { console.error('Security Check Error:', e); }
                         
-                        // إزالة فخ البلوك
                         if (fpData && fpData.status === 'blocked') { 
                             setLoginError('لا يمكن فتح التطبيق! لقد سبق واستخدم هذا الحساب في متصفح آخر. عُد للمتصفح الأول الذي قمت بتسجيل الدخول عليه أول مرة.'); 
                             setIsLoading(false); 
@@ -687,7 +700,7 @@
             };
 
             useEffect(() => {
-                if (screen === 'result' && activeLesson) {
+                if (screen === 'result' && activeLesson && !activeLesson.id?.startsWith('virtual_')) {
                     const totalQs = activeLesson.questions.length; 
                     const correct = userAnswers.filter(a => a && a.isCorrect).length; 
                     const perc = Math.round((correct/totalQs)*100);
@@ -700,10 +713,13 @@
                     <div className="h-screen w-full flex items-center justify-center p-4 bg-gray-50">
                         <div className="bg-white p-8 rounded-3xl shadow-2xl text-center max-w-md w-full border-t-8 border-secondary animate-fade-in relative overflow-hidden">
                             <i className="fas fa-hand-sparkles text-6xl text-secondary mb-6 block relative z-10"></i>
-                            <h2 className="text-3xl font-black text-primary mb-4 relative z-10">مرحباً يا بطل {String(studentName || '').split(' ')[0]}!</h2>
-                            <p className="text-lg text-gray-600 font-semibold mb-8 relative z-10">مستعد نكمل ما بدأناه؟</p>
-                            <button onClick={handleResume} disabled={isLoading} className="bg-secondary text-white font-black text-xl py-4 px-10 rounded-full w-full shadow-lg mb-4 hover:bg-pink-600 transition-colors relative z-10">
-                                {isLoading ? <i className="fas fa-spinner fa-spin"></i> : 'تأكيد (نعم مستعد) 🚀'}
+                            <h2 className="text-3xl font-black text-primary mb-4 relative z-10">مرحبا يا : {String(studentName || '').split(' ')[0]}</h2>
+                            <div className="mb-8 relative z-10">
+                                <p className="text-xl text-gray-800 font-black mb-2">هل مستعد لنكمل مغامرتنا</p>
+                                <p className="text-lg text-gray-600 font-bold">انت قد المسؤلية نبدأ يا بطل</p>
+                            </div>
+                            <button onClick={handleResume} disabled={isLoading} className="bg-secondary text-white font-black text-2xl py-4 px-10 rounded-full w-full shadow-lg mb-4 hover:bg-pink-600 transition-colors relative z-10">
+                                {isLoading ? <i className="fas fa-spinner fa-spin"></i> : 'نعم'}
                             </button>
                             <button onClick={handleLogout} className="text-gray-500 font-bold text-sm underline hover:text-red-500 mt-2 relative z-10">
                                 تسجيل خروج (لست {String(studentName || '').split(' ')[0]})
@@ -1060,7 +1076,7 @@
                 };
 
                 const handleTouchStart = (e) => {
-                    touchStartX.current = e.targetTouches[0].clientX;
+                    touchStartX.current = e.touches[0].clientX;
                 };
 
                 const handleTouchEnd = (e) => {
@@ -1070,12 +1086,12 @@
                     if (touchStartX.current === null || touchEndX.current === null) return;
                     const diff = touchStartX.current - touchEndX.current;
                     
-                    if (diff > 50) { 
+                    if (diff > 40) { 
                         if (isAnswered) {
                             if (currentQIndex < totalQs - 1) setCurrentQIndex(currentQIndex + 1);
                             else setScreen('result');
                         }
-                    } else if (diff < -50) { 
+                    } else if (diff < -40) { 
                         if (currentQIndex > 0) setCurrentQIndex(currentQIndex - 1);
                     }
                     
@@ -1225,7 +1241,33 @@
                                 )}
                             </div>
 
-                            <button onClick={()=>{setData(data.map(u=>({...u,lessons:u.lessons.map(l=>l.id===activeLesson.id?{...l,completed:true}:l)}))); setScreen('index');}} className="bg-primary text-white font-black text-xl md:text-2xl py-4 px-10 rounded-full w-full hover:bg-gray-900 transition-colors shadow-lg">العودة للفهرس</button>
+                            <div className="flex flex-col gap-3 w-full">
+                                {perc < 100 && (
+                                    <button onClick={() => {
+                                        const wrongQuestions = activeLesson.questions.filter((q, idx) => {
+                                            const ans = userAnswers[idx];
+                                            return !ans || !ans.isCorrect;
+                                        });
+                                        const virtualLesson = {
+                                            ...activeLesson,
+                                            id: activeLesson.id.startsWith('virtual_') ? activeLesson.id : 'virtual_' + activeLesson.id,
+                                            title: activeLesson.title.includes('معالجة أخطاء') ? activeLesson.title : 'معالجة أخطاء: ' + activeLesson.title,
+                                            questions: wrongQuestions
+                                        };
+                                        setActiveLesson(virtualLesson);
+                                        setUserAnswers([]);
+                                        setCurrentQIndex(0);
+                                        setScreen('quiz');
+                                    }} className="bg-red-500 text-white font-black text-xl md:text-2xl py-4 px-10 rounded-full w-full hover:bg-red-600 transition-colors shadow-lg border-2 border-red-600">
+                                        إعادة اختبار الأجزاء الخاطئة 🔄
+                                    </button>
+                                )}
+                                <button onClick={()=>{
+                                    const originalId = activeLesson.id.replace('virtual_', '');
+                                    setData(data.map(u=>({...u,lessons:u.lessons.map(l=>l.id===originalId?{...l,completed:true}:l)}))); 
+                                    setScreen('index');
+                                }} className="bg-primary text-white font-black text-xl md:text-2xl py-4 px-10 rounded-full w-full hover:bg-gray-900 transition-colors shadow-lg">العودة للفهرس</button>
+                            </div>
                         </div>
                     </div>
                 );
